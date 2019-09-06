@@ -3,15 +3,15 @@ title: "Bayesian Learning - Lab 03"
 author: "Anub Dikshit (anudi287) and Maximilian Pfundstein (maxpf364)"
 date: "`r Sys.Date()`"
 output:
+  pdf_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
   html_document:
     df_print: paged
     toc: true
     toc_float: false
     number_sections: false
-  pdf_document:
-    toc: true
-    toc_depth: 3
-    number_sections: true
 ---
 
 ```{r setup, include=FALSE}
@@ -19,8 +19,11 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 library(bnlearn)
 library(tibble)
-if (!requireNamespace("BiocManager", quietly = TRUE))
-    install.packages("BiocManager")
+library(dplyr)
+library(gRain)
+library(caret)
+#if (!requireNamespace("BiocManager", quietly = TRUE))
+#    install.packages("BiocManager")
 #BiocManager::install("RBGL")
 set.seed(42)
 ```
@@ -29,10 +32,15 @@ set.seed(42)
 
 First we will load the data set and have a look at it.
 
-```{r}
+```{r, warning=FALSE, echo=FALSE, include=FALSE}
 
 as_tibble("asia")
-asia
+
+```
+
+```{r}
+
+head(asia)
 
 ```
 
@@ -43,7 +51,7 @@ To show that different runs of the hill climbing algorithm yield in different re
 
 The hill climbing algorithm is basically finding the next global maximum (or minimum), which is a really easy approach but will also not give us good results.
 
-## 1) Same graph
+## Same Graph
 
 So we will first create a random graph using the dataset.
 
@@ -92,7 +100,7 @@ score(bayes_net1_hc_restart_vhigh, asia)
 
 ```
 
-## 2) Different graphs
+## 2) Different Graphs
 
 If we use different random graphs in the beginning, the hill climbing algorithm will find different local optima.
 
@@ -115,6 +123,73 @@ bayes_net2_2_hc = hc(asia, start = random.graph(colnames(asia)), restart = 100)
 
 score(bayes_net2_1_hc, asia)
 score(bayes_net2_2_hc, asia)
+
+```
+
+# Inference
+
+First we split into training and test, by sampling randomy.
+
+```{r}
+
+asia = asia %>% mutate(id = row_number())
+train = asia %>% sample_frac(.8)
+test = anti_join(asia, train, by = 'id')
+
+train = select(train, -id)
+test = select(test, -id)
+testX = select(test, -S)
+testY = test %>% select(S)
+
+```
+
+First we learn the network structure and then we fit the parameters. Afterwards we tranform the object to a `grain` object.
+
+```{r}
+
+bn_1 = iamb(train)
+plot(bn_1)
+
+bn_1_fit = bn.fit(bn_1, train)
+bn_1_grain = as.grain(bn_1_fit)
+#bn_1_compiled = compile(bn_1_grain)
+
+```
+
+```{r}
+
+## bnlearn
+# bn.fit
+# as.grain
+
+## gRain
+# compile
+# setFindings (deprecated)
+# querygrain
+
+## Inference (from bnlearn)
+# prob.table
+# table
+# cpdist
+
+#querygrain(setEvidence(bn_1_grain, "S", ))
+
+#firstRow = testX[1,]
+#testRow = firstRow %>% mutate(A = "yes", T = "yes", L = "yes", B = "yes")
+
+res = t(apply(testX, 1, FUN = function(x) {
+  return(querygrain(setEvidence(bn_1_grain, names(x), x))$S)
+}))
+
+pred = apply(res, 1, FUN = function(x) {
+  if (x[2] > 0.5) return("yes")
+  return("no")
+})
+
+testY_factor = testY[,1]
+pred_factor = factor(pred)
+
+confusionMatrix(pred_factor, testY_factor, mode="everything")
 
 ```
 
