@@ -3,15 +3,15 @@ title: "Bayesian Learning - Lab 03"
 author: "Anub Dikshit (anudi287) and Maximilian Pfundstein (maxpf364)"
 date: "`r Sys.Date()`"
 output:
-  pdf_document:
-    toc: true
-    toc_depth: 3
-    number_sections: true
   html_document:
     df_print: paged
     toc: true
     toc_float: false
     number_sections: false
+  pdf_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
 ---
 
 ```{r setup, include=FALSE}
@@ -143,18 +143,22 @@ testY = test %>% select(S)
 
 ```
 
-First we learn the network structure and then we fit the parameters. Afterwards we tranform the object to a `grain` object.
+First we learn the network structure and then we fit the parameters. Afterwards we tranform the object into a `grain` object.
 
 ```{r}
 
+# Network
 bn_1 = iamb(train)
 plot(bn_1)
 
+# Parameters
 bn_1_fit = bn.fit(bn_1, train)
 bn_1_grain = as.grain(bn_1_fit)
 #bn_1_compiled = compile(bn_1_grain)
 
 ```
+
+Using the given evidence we calculate the posterior porbability for each case. We then take the posterior probability to classify the test data. As a comparison we also take the built in `predict()` function.
 
 ```{r}
 
@@ -177,21 +181,53 @@ bn_1_grain = as.grain(bn_1_fit)
 #firstRow = testX[1,]
 #testRow = firstRow %>% mutate(A = "yes", T = "yes", L = "yes", B = "yes")
 
+# predict for each data point of the test data
 res = t(apply(testX, 1, FUN = function(x) {
   return(querygrain(setEvidence(bn_1_grain, names(x), x))$S)
 }))
 
+# classify
 pred = apply(res, 1, FUN = function(x) {
   if (x[2] > 0.5) return("yes")
   return("no")
 })
 
+# Factorize
 testY_factor = testY[,1]
 pred_factor = factor(pred)
 
+# We will use predict to compare our own inference with the build in version
+pred_sol_factor = predict(bn_1_fit, "S", data = test, method="bayes-lw")
+
+# Call to a library to calculate interesting metrics
 confusionMatrix(pred_factor, testY_factor, mode="everything")
 
 ```
+
+```{r}
+
+confusionMatrix(pred_sol_factor, testY_factor, mode="everything")
+
+```
+
+As we can see, we observe the exact same results.
+
+The true bayesian network is given by the following:
+
+```{r}
+
+dag = model2network("[A][S][T|A][L|S][B|S][D|B:E][E|T:L][X|E]")
+dag_true = bn.fit(dag, train)
+pred_dag_true = predict(dag_true, "S", data = test, method="bayes-lw")
+
+confusionMatrix(pred_dag_true, testY_factor, mode="everything")
+
+```
+
+We see that the true network just has a slightly better F1 scoare compared to the trained versions from the data.
+
+# Markow Blanket
+
 
 
 # Source Code
