@@ -204,7 +204,7 @@ predict_bayesian_network = function(bayesian_network,
   
   # predict for each data point of the test data
   if (!is.null(markov_blanket)) {
-    # When predicting, only use the nodes from the Markow blanket
+    # When predicting, only use the nodes from the Markov Blanket
     res = t(parApply(cl, testX, 1, FUN = function(x) {
       return(querygrain(setEvidence(bayesian_network, markov_blanket,
                                     x[markov_blanket]))$S)
@@ -217,13 +217,13 @@ predict_bayesian_network = function(bayesian_network,
     }))
   }
   
-  # classify
+  # Classify
   pred = parApply(cl, res, 1, FUN = function(x) {
     if (x[2] > 0.5) return("yes")
     return("no")
   })
   
-  # Factorize
+  # Factorise
   testY_factor = testY_[,1]
   pred_factor = factor(pred)
   
@@ -271,7 +271,7 @@ confusionMatrix(predicate_2_sol, testY_factor, mode="everything")
 
 ```
 
-As we can see, we observe the very similar results.
+As we can see, we observe very similar results.
 
 The true Bayesian network is given by the following:
 
