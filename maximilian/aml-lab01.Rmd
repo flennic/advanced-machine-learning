@@ -3,15 +3,15 @@ title: "Bayesian Learning - Lab 03"
 author: "Anub Dikshit (anudi287) and Maximilian Pfundstein (maxpf364)"
 date: "`r Sys.Date()`"
 output:
+  pdf_document:
+    toc: true
+    toc_depth: 3
+    number_sections: true
   html_document:
     df_print: paged
     toc: true
     toc_float: false
     number_sections: false
-  pdf_document:
-    toc: true
-    toc_depth: 3
-    number_sections: true
 ---
 
 ```{r setup, include=FALSE}
@@ -226,9 +226,80 @@ confusionMatrix(pred_dag_true, testY_factor, mode="everything")
 
 We see that the true network just has a slightly better F1 scoare compared to the trained versions from the data.
 
-# Markow Blanket
+# Markov Blanket
 
+First we will extract the *Markov Blanket* using the function `mb()`. The *Markov Blanket* are all nodes that shield the node in question from the rest of the network. Then we apply the same predecure as before and look at the results.
 
+```{r}
+
+markov_blanket = mb(bn_1, "S")
+
+# predict for each data point of the test data
+res_mb = t(apply(testX, 1, FUN = function(x) {
+  return(querygrain(setEvidence(bn_1_grain, markov_blanket, x[markov_blanket]))$S)
+}))
+
+# classify
+pred_mb = apply(res_mb, 1, FUN = function(x) {
+  if (x[2] > 0.5) return("yes")
+  return("no")
+})
+
+# Factorize
+pred_factor_mb = factor(pred_mb)
+
+# Call to a library to calculate interesting metrics
+confusionMatrix(pred_factor_mb, testY_factor, mode="everything")
+
+```
+
+As we can see the F1 score (and so the results) remain unchanged when only considering the markov blanket.
+
+# Naive Bayes
+
+The Naive Bayes classifier assumes independence between all the predictive variables. Therefore the classifier is given by
+
+$$ p(S | x_i) \propto p(S) \prod_{i=1}^{N} p(x_i|S)  $$
+
+$x_i$ are the features, therefore our bayesian network structure is based on the following formula:
+
+$ p(S) \propto p(S) p(A|S)p(T|S) p(L|S) p(B|S) p(E|S) p(X|S) p(D|S) $
+
+```{r}
+
+# Structure
+bn_naive_bayes = model2network("[S][A|S][T|S][L|S][B|S][E|S][X|S][D|S]")
+plot(bn_naive_bayes)
+
+```
+
+As the can see, according to our model there exist no dependence between the features. Let's train the parameters and look at the results.
+
+```{r}
+
+bn_naive_bayes_fit = bn.fit(bn_naive_bayes, train)
+bn_naive_bayes_grain = as.grain(bn_naive_bayes_fit)
+
+# predict for each data point of the test data
+res_naive_bayes = t(apply(testX, 1, FUN = function(x) {
+  return(querygrain(setEvidence(bn_naive_bayes_grain, names(x), x))$S)
+}))
+
+# classify
+pred_naive_bayes = apply(res_naive_bayes, 1, FUN = function(x) {
+  if (x[2] > 0.5) return("yes")
+  return("no")
+})
+
+# Factorize
+pred_factor_naive_bayes = factor(pred_naive_bayes)
+
+# Call to a library to calculate interesting metrics
+confusionMatrix(pred_factor_naive_bayes, testY_factor, mode="everything")
+
+```
+
+# Explanation of Different Results
 
 # Source Code
 
