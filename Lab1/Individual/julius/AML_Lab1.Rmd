@@ -318,7 +318,7 @@ predict_exact = function(dag_fitted, df_te, y_name, markov = FALSE){
       var_names = names(x)
       var_values = vapply(x, as.character, character(1))
     } else {
-      var_names = mb(dag_fitted, "S")
+      var_names = mb(dag_fitted, y_name)
       var_values = vapply(x, as.character, character(1))[var_names]
     }
     evidence = setEvidence(junction, nodes = var_names, states = var_values)
