@@ -184,7 +184,7 @@ train_bayesian_network = function(structure = NULL,
   
   # Parameters
   bayesian_network_fit = bn.fit(bayesian_network, data)
-  bayesian_network_grain = as.grain(bayesian_network_fit)
+  bayesian_network_grain = compile(as.grain(bayesian_network_fit))
   
   return(list(bn_grain=bayesian_network_grain,
               bn_fit=bayesian_network_fit,
