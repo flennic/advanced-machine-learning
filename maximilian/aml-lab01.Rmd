@@ -1,7 +1,6 @@
 ---
 title: "Advanced Machine Learning - Lab 01"
-author: G. Hari Prasath (hargo729), Julius Kittler (julki029), Hector Plata (hecpl268)
-  and Maximilian Pfundstein (maxpf364)
+author: "G. Hari Prasath (hargo729), Julius Kittler (julki029), Hector Plata (hecpl268) and Maximilian Pfundstein (maxpf364)"
 date: "`r Sys.Date()`"
 output:
   pdf_document:
