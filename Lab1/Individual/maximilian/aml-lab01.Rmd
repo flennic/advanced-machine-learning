@@ -26,15 +26,15 @@ library(dplyr)
 library(gRain)
 library(caret)
 library(parallel)
-#if (!requireNamespace("BiocManager", quietly = TRUE))
-#    install.packages("BiocManager")
-#BiocManager::install("RBGL")
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install("RBGL")
 set.seed(42)
 ```
 
 # Hill Climbing
 
-**Task:** Show that multiple runs of the hill-climbing algorithm can return non-equivalent Bayesian network (BN) structures. Explain why this happens. Use the Asia dataset which is included in the `bnlearn package`. To load the data, run `data("asia")`.
+**Task:** Show that multiple runs of the hill-climbing algorithm can return non-equivalent Bayesian network (BN) structures. Explain why this happens. Use the Asia dataset which is included in the `bnlearn` package. To load the data, run `data("asia")`.
 
 **Hint:** Check the function `hc` in the `bnlearn` package. Note that you can specify the initial structure, the number of random restarts, the score, and the equivalent sample size (a.k.a imaginary sample size) in the BDeu score. You may want to use these options to answer the question. You may also want to use the functions `plot`, `arcs`, `vstructs`, `cpdag` and `all.equal`.
 
@@ -140,7 +140,7 @@ score(bayes_net2_2_hc, asia)
 
 # Inference
 
-**Task:** Learn a BN from 80 % of the Asia dataset. The dataset is included in the bnlearn package. To load the data, run `data("asia")`. Learn both the structure and the parameters. Use any learning algorithm and settings that you consider appropriate. Use the BN learned to classify the remaining 20 % of the Asia dataset in two classes: `S = yes` and `S = no`. In other words, compute the posterior probability distribution of S for each case and classify it in the most likely class. To do so, you **have** to use exact or approximate inference with the help of the `bnlearn` and `gRain` packages, i.e. you are not allowed to use functions such as `predict`. Report the confusion matrix, i.e. true/false positives/negatives. Compare your results with those of the true Asia BN, which can be obtained by running
+**Task:** Learn a BN from 80 % of the Asia dataset. The dataset is included in the `bnlearn` package. To load the data, run `data("asia")`. Learn both the structure and the parameters. Use any learning algorithm and settings that you consider appropriate. Use the BN learned to classify the remaining 20 % of the Asia dataset in two classes: `S = yes` and `S = no`. In other words, compute the posterior probability distribution of S for each case and classify it in the most likely class. To do so, you **have** to use exact or approximate inference with the help of the `bnlearn` and `gRain` packages, i.e. you are not allowed to use functions such as `predict`. Report the confusion matrix, i.e. true/false positives/negatives. Compare your results with those of the true Asia BN, which can be obtained by running
 `dag = model2network("[A][S][T|A][L|S][B|S][D|B:E][E|T:L][X|E]")`
 
 **Hint:** You already know the Lauritzen-Spiegelhalter algorithm for inference in BNs, which is an exact algorithm. There are also approximate algorithms for when the exact ones are too demanding computationally. For exact inference, you may need the functions `bn.fit` and `as.grain` from the `bnlearn` package, and the functions `compile`, `setFinding` and `querygrain` from the package `gRain`. For approximate inference, you may need the functions `prop.table`, `table` and `cpdist` from the `bnlearn` package. When you try to load the package `gRain`, you will get an error as the package RBGL cannot be found. You have to install this package by running the following two commands (answer no to any offer to update packages):
@@ -170,11 +170,12 @@ testY = test %>% select(S)
 ## Training the network
 train_bayesian_network = function(structure = NULL,
                                   data = train,
-                                  learning_algorithm = iamb) {
+                                  learning_algorithm = iamb,
+                                  ...) {
 
   # Network
   if (is.null(structure)) {
-    bayesian_network = iamb(data)
+    bayesian_network = learning_algorithm(data, ...)
   }
   else {
     bayesian_network = structure
@@ -182,7 +183,7 @@ train_bayesian_network = function(structure = NULL,
   
   # Parameters
   bayesian_network_fit = bn.fit(bayesian_network, data)
-  bayesian_network_grain = as.grain(bayesian_network_fit)
+  bayesian_network_grain = compile(as.grain(bayesian_network_fit))
   
   return(list(bn_grain=bayesian_network_grain,
               bn_fit=bayesian_network_fit,
@@ -242,8 +243,7 @@ First we learn the network structure and then we fit the parameters. Afterwards 
 ```{r}
 
 bn_2 = train_bayesian_network(structure = NULL,
-                       data = train,
-                       learning_algorithm = iamb)
+                       data = train)
 
 ```
 

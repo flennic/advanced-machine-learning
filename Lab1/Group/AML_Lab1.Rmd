@@ -1,0 +1,714 @@
+---
+title: "732A96: AML - Computer Lab 1"
+classoption: table
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 1
+    number_sections: true
+    fig_width: 7
+    fig_height: 4
+    highlight: tango
+header-includes:
+- \usepackage{float}
+- \usepackage{booktabs}
+- \usepackage{amsmath}
+- \usepackage{cancel}
+fontsize: 12pt
+geometry: margin = 0.8in
+author: G. Hari Prasath (hargo729), Julius Kittler (julki029), Hector Plata (hecpl268)
+  and Maximilian Pfundstein (maxpf364)
+date: September 17, 2019
+---
+
+```{r setup, echo = TRUE, include=TRUE, results='hide', message=FALSE, warning=FALSE}
+
+# Set up general options
+
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, 
+                      fig.width=6, fig.height=5#, collapse=TRUE
+                      )
+
+set.seed(12345)
+library(ggplot2)
+options(kableExtra.latex.load_packages = FALSE)
+library(kableExtra)
+
+options(scipen=999)
+
+# Prepare packages
+library("bnlearn") # ls('package:bnlearn') # to show all functions
+library("gRain")
+library('RBGL')
+
+```
+
+
+```{r echo = TRUE, eval = TRUE}
+
+# Auxilary functions
+analyze_cm = function(cm, true){
+  
+  stopifnot(true %in% colnames(cm))
+  levels = c(true, colnames(cm)[-which(colnames(cm) == true)]) # ORDER: 1; 0 
+  cm = as.data.frame(cm); colnames(cm)[1:2] = c("True", "Pred")
+  N = sum(cm$Freq)
+  Npos = sum(cm$Freq[which(cm$True == levels[1])])
+  Nneg = sum(cm$Freq[which(cm$True == levels[2])])
+  TP = sum(cm$Freq[which(cm$True == levels[1] & cm$Pred == levels[1])])
+  TN = sum(cm$Freq[which(cm$True == levels[2] & cm$Pred == levels[2])])
+  FP = sum(cm$Freq[which(cm$True == levels[2] & cm$Pred == levels[1])])
+  
+  FN = sum(cm$Freq[which(cm$True == levels[1] & cm$Pred == levels[2])])
+  return(data.frame(MCR = (FP+FN)/N, Accuracy = (TP + TN)/N, 
+                    Recall = TP/Npos, # recall = TPR = sensitivity,
+                    Precision = TP/(TP + FP),
+                    FPR = FP/Nneg, TNR = TN/Nneg)) # TNR = specificity
+}
+
+# cm = table(Y_true, Y_pred, dnn = c("True", "Predicted"))
+# knitr::kable(analyze_cm(cm, true = "yes"))
+
+```
+
+***
+
+# Assignment 1: Hill Climbing
+
+The purpose of the lab is to put in practice some of the concepts covered in the lectures.
+
+(1) Show that multiple runs of the hill-climbing algorithm can return non-equivalent Bayesian network (BN) structures. Explain why this happens. Use the Asia dataset which is included in the bnlearn package. To load the data, run data("asia").
+
+Hint: Check the function `hc` in the `bnlearn` package. Note that you can specify the initial structure, the number of random restarts, the score, and the equivalent sam- ple size (a.k.a imaginary sample size) in the BDeu score. You may want to use these options to answer the question. You may also want to use the functions plot, `arcs`, `vstructs`, `cpdag` and `all.equal`.
+
+***
+
+```{r echo=FALSE}
+
+# ------------------------------------------------------------------------------
+# Assignment 1
+# ------------------------------------------------------------------------------
+
+```
+
+```{r echo = TRUE}
+
+# Prepare data
+data("asia")
+df = data.frame(asia)
+rm(asia)
+head(df)
+
+```
+
+
+**Object of change**
+
+- A change in direction of certain arrows (i.e. relations) was the main change that was observed.
+- When the score criterion changed, some arrows appeared/disappeared completely.
+
+**Reason for changes**
+
+According to the documentation, `Hill-Climbing (hc)` is a `a hill climbing greedy search that explores the space of the directed acyclic graphs by single-arc addition, removal and reversals; with random restarts to avoid local optima. The optimized implementation uses score caching, score decomposability and score equivalence to reduce the number of duplicated tests.` Hence, the reasons for non-equivalent BN structures are:
+
+- *random restarts*: If different initial starting points are found, the algorithm may get stuck in (different) local optima. The parameter `restart` has to be larger than 0 to allow this variation.
+- *same scores*: The example below shows that non-equivalent BNs can have the same score (e.g. BIC score). Hence, the algorithm has no incentive to prioritze the one or the other of these non-equivalent BNs.
+- *different scores metrics*: If different evaluation criteria are used e.g. BIC vs. AIC, the space of the DAGs is explored differently and hence, different results are possible.
+
+\newpage 
+
+**Example 1 (random restarts)**
+
+In the example below, we set `restart=10` and we can see that the arrow
+points from L to S vs. from S to L in the two diagrams.
+
+```{r echo = TRUE}
+
+# Train models
+res1 = hc(df, restart=10, score='bic')
+res2 = hc(df, restart=10, score='bic')
+
+```
+
+
+```{r echo = FALSE}
+
+# Overview and scores
+all.equal(res1, res2)
+cat("Score BN 1: ", bnlearn::score(res1, df)) # smaller BIC is better
+cat("Score BN 2: ", bnlearn::score(res2, df))
+
+# Visual Comparison of arcs
+par(mfrow = c(1, 2))
+graphviz.compare(res1, res2, main = c("Run 1 (with BIC)", "Run 2 (with BIC)"))
+
+# Printed comparison of arcs
+comp = compare(res1, res2)
+cat("true positive (tp) arcs, which appear both in target and in current:", comp$tp)
+cat("false positive (fp) arcs, which appear in current but not in target:", comp$fp)
+cat("false negative (fn) arcs, which appear in target but not in current:", comp$fn)
+
+# Hamming
+cat('Same Skeleton:', all.equal(skeleton(res1), skeleton(res2)))
+cat("Hamming distance (zero if same skeleton):", hamming(res1, res2))
+cat("Struct. hamming distance:", shd(res1, res2))
+
+# Other ------------------------------------------------------------------------
+
+# # Create individual plots for each dag
+# plot(res1)
+# plot(res2)
+
+# # Print the arcs (from, to) for each dag
+# arcs(res1)
+# arcs(res12
+
+# vstructs(res1)
+# vstructs(res2)
+
+# cpdag(res1)
+# cpdag(res2)
+
+```
+
+**Example 2 (different scores metrics: aic)**
+
+After using `aic`, we see that the resulting networks looks very different than the above networks (comparison to the 2nd network from above). This time, also the score differs since a different score metric was used for training.
+
+```{r echo = TRUE}
+
+res3 = hc(df, restart=10, score='aic')
+
+```
+
+```{r echo = FALSE}
+
+cat("Score BN 3: ", bnlearn::score(res3, df)) # smaller AIC is better
+
+par(mfrow = c(1, 2))
+graphviz.compare(res2, res3, main = c("Run 2 (with BIC)", "Run 3 (with AIC)"))
+
+```
+
+
+**Alternatives**
+
+We can also randomly initialize a graph and run `hc`. If we do this several times, 
+we may also notice different structures due to to different random starting points. 
+They may cause the heuristic algorithm to get stuck in different local optima.
+If we were to then increase the `restart` parameter from e.g. 1 to 1000, we 
+still get the same result because `hc` (likely) manages to find the global optimum.
+
+```{r echo = TRUE}
+
+rand = random.graph(colnames(df))
+res4 = hc(asia, start = rand)
+
+```
+
+**References**
+
+- http://www.bnlearn.com/examples/compare-dags/
+- http://bnlearn.com/examples/score/ 
+
+
+# Assignment 2: Structure/Parameter Learning and Inference
+
+Learn a BN from 80 % of the Asia dataset. The dataset is included in the bnlearn package. To load the data, run `data("asia")`. Learn both the structure and the parameters. Use any learning algorithm and settings that you consider appropriate. Use the BN learned to classify the remaining 20 % of the Asia dataset in two classes: `S = yes` and `S = no`. In other words, compute the posterior probability distribution of S for each case and classify it in the most likely class. To do so, you have to use exact or approximate inference with the help of the `bnlearn` and `gRain` packages, i.e. you are not allowed to use functions such as `predict`. Report the confusion matrix, i.e. true/false positives/negatives. Compare your results with those of the true Asia BN, which can be obtained by running
+`dag = model2network("[A][S][T|A][L|S][B|S][D|B:E][E|T:L][X|E]")`.
+
+Hint: You already know the Lauritzen-Spiegelhalter algorithm for inference in BNs, which is an exact algorithm. There are also approximate algorithms for when the exact ones are too demanding computationally. For exact inference, you may need the functions `bn.fit` and `as.grain` from the bnlearn package, and the functions `compile`, `setFinding` and `querygrain` from the package `gRain`. For approximate inference, you may need the functions `prop.table`, `table` and `cpdist` from the `bnlearn` package. When you try to load the package `gRain`, you will get an error as the pack- age `RBGL` cannot be found. You have to install this package by running the following two commands (answer no to any offer to update packages):
+
+```
+  source("https://bioconductor.org/biocLite.R")
+  biocLite("RBGL")
+```
+    
+    
+```{r echo=FALSE}
+
+# ------------------------------------------------------------------------------
+# Assignment 2
+# ------------------------------------------------------------------------------
+
+```
+
+****
+
+**Prepare data**
+
+```{r echo = TRUE}
+
+# Prepare data
+data("asia")
+df = asia
+#df = data.frame(apply(asia, 2, as.character), stringsAsFactors = F) 
+rm(asia)
+
+# Split data randomly
+set.seed(12345)
+N = nrow(df)
+idx = sample(1:N, round(N * 0.8))
+df_tr = df[idx, ]
+df_te = df[-idx, ]
+
+```
+
+**Fit model on training data**
+
+First, we have to learn the network structure and second we have to learn the
+parameters. To learn the stucture, we could choose one out of many different
+algorithms: constraint-based, score based, local search. Here, the (BIC) score-based
+algorithm `Hill-Climbing` is used. For learning the parameters, the method
+`mle` was used (for Bayesian parameter estimation).
+
+```{r echo = TRUE}
+
+# Fit the structure (given data set)
+dag = hc(df_tr, restart=100, score='bic')
+# dag = iamb(df_tr)
+
+# Fit the parameters (given structure and data set)
+dag_fitted = bn.fit(dag, df_tr, method='mle')
+
+```
+
+**Show model**
+
+```{r echo = FALSE}
+
+# Show model 
+plot(dag)
+
+# Show conditional probabilities for S
+dag_fitted$S
+bn.fit.dotplot(dag_fitted$S) # bn.fit.barchart(dag_fitted$S)
+
+```
+
+**Evaluate model on test data**
+
+Here, we use the BN learned to classify the remaining 20 % of the Asia dataset in two classes: S = yes and S = no. We compute the posterior probability distribution of S for each case and classify it in the most likely class. For that, we use the packages `bnlearn` (for approximate inference with Monte Carlo) or `gRain` (for exact inference).
+
+*Exact inference*
+
+```{r echo = TRUE}
+
+predict_exact = function(dag_fitted, df_te, y_name, markov = FALSE){
+  
+  # ----------------------------------------------------------------------------
+  # Input: 
+  # - dag_fitted: dag with learned structure and parameters
+  # - df_te: data frame with all features and the Y (all factors)
+  # - y_name: string with the name of the Y variable
+  
+  # Output: 
+  # - list with factor vectors: Y_true and Y_pred
+  # ----------------------------------------------------------------------------
+  
+  junction = compile(as.grain(dag_fitted))
+
+  N = nrow(df_te)
+  Y_true = df_te[[y_name]]
+  Y_pred = numeric(length = N)
+  Y_space = as.character(unique(Y_true))
+  
+  for (i in 1:N){
+    
+    # With all RVs
+    x = df_te[i, colnames(df_te) != y_name]
+    
+    if (markov == FALSE){
+      var_names = names(x)
+      var_values = vapply(x, as.character, character(1))
+    } else {
+      var_names = mb(dag_fitted, y_name)
+      var_values = vapply(x, as.character, character(1))[var_names]
+    }
+    evidence = setEvidence(junction, nodes = var_names, states = var_values)
+   
+    Y_prob = querygrain(evidence, nodes = y_name)[[1]]
+    Y_pred[i] = Y_space[which.max(Y_prob)]
+    
+  }
+  
+  return(list(Y_pred = Y_pred, Y_true = Y_true))
+  
+}
+
+
+# Make predictions
+res = predict_exact(dag_fitted, df_te, "S")
+Y_true = res$Y_true
+Y_pred = res$Y_pred
+
+```
+
+```{r}
+
+# Evaluate predictions
+
+cat("Confusion matrix (absolute):\n")
+cm = table(Y_true, Y_pred, dnn = c("True", "Predicted"))
+print(cm)
+asg2_exact = cm
+
+cat("\nConfusion matrix (relative):\n")
+table(Y_true, Y_pred, dnn = c("True", "Predicted"))/N
+
+cat("\nPerformance statistics:\n")
+knitr::kable(analyze_cm(cm, true = "yes"))
+
+```
+
+```{r}
+
+# Alternative: The below code could be used if we only wanted to use node "B"
+# for prediction
+
+# # With only B as RV
+# val = as.character(df_te[i, 'B'])
+# evidence = setEvidence(junction, nodes = "B", states = val)
+
+```
+
+*Approximate inference*
+
+Note: `cpquery` was used here instead of `cdist`. Unfortunately, we had to hardcode
+various values for that. Also, there was an issue with using `cpquery` in a function:
+It could only find `x` if it is in the main working environment.
+
+```{r echo = TRUE}
+
+# ----------------------------------------------------------------------------
+# Input: 
+# - dag_fitted: dag with learned structure and parameters
+# - df_te: data frame with all features and the Y (all factors)
+
+# MAKE SURE TO ADJUST THE EVIDENCE AND EVENT!
+# ----------------------------------------------------------------------------
+
+N = nrow(df_te)
+Y_true = df_te[['S']]
+Y_pred = numeric(length = N)
+Y_space = as.character(unique(Y_true))
+Y_prob = numeric(length = length(Y_space))
+junction = compile(as.grain(dag_fitted))
+
+for (i in 1:N){
+  
+  # With all RVs
+  x = vapply(df_te[i, colnames(df_te) != 'S'], as.character, character(1))
+  
+  for (j in 1:length(Y_space)){
+    Y_prob[j] = cpquery(dag_fitted, event = (S == Y_space[j]), 
+                          evidence = ((A == x['A']) & (T == x['T'])
+                                      & (L == x['L']) & (B == x['B'])
+                                      & (E == x['E']) & (X == x['X'])
+                                      & (D == x['E']))
+                        )
+  }
+  
+  Y_pred[i] = Y_space[which.max(Y_prob)]
+}
+
+
+```
+
+
+```{r}
+
+# Evaluate predictions
+
+cat("Confusion matrix (absolute):\n")
+cm = table(Y_true, Y_pred, dnn = c("True", "Predicted"))
+print(cm)
+asg2_approx = cm
+
+cat("\nConfusion matrix (relative):\n")
+table(Y_true, Y_pred, dnn = c("True", "Predicted"))/N
+
+cat("\nPerformance statistics:\n")
+knitr::kable(analyze_cm(cm, true = "yes"))
+
+```
+
+
+**Comparison with true DAG (only exact inference)**
+
+```{r echo = TRUE}
+
+# Prepare the structure 
+
+# Option 1: 
+dag_true = model2network("[A][S][T|A][L|S][B|S][D|B:E][E|T:L][X|E]")
+
+# #Option 2
+# dag_true = empty.graph(names(df))
+# modelstring(dag_true) = "[A][S][T|A][L|S][B|S][D|B:E][E|T:L][X|E]"
+
+# Visual comparison only:
+par(mfrow = c(1, 2))
+graphviz.compare(dag, dag_true, main = c("Learned", "True"))
+
+```
+
+```{r echo = TRUE}
+
+# Fit the parameters (given structure and data set)
+dag_fitted = bn.fit(dag_true, df_tr, method='mle')
+
+# Make predictions
+res = predict_exact(dag_fitted, df_te, "S")
+Y_true = res$Y_true
+Y_pred = res$Y_pred
+
+```
+
+```{r}
+
+# Evaluate predictions
+
+cat("Confusion matrix (absolute):\n")
+cm = table(Y_true, Y_pred, dnn = c("True", "Predicted"))
+print(cm)
+asg2_true = cm
+
+cat("\nConfusion matrix (relative):\n")
+table(Y_true, Y_pred, dnn = c("True", "Predicted"))/N
+
+cat("\nPerformance statistics:\n")
+knitr::kable(analyze_cm(cm, true = "yes"))
+
+```
+
+**References**
+
+- http://bnlearn.com/examples/whitelist/
+- http://bnlearn.com/documentation/man/structure.learning.html 
+- http://bnlearn.com/examples/fit/
+
+# Assignment 3: Structure/Parameter Learning and Inference (Markov Blanket)
+
+In the previous exercise, you classified the variable S given observations for all the rest of the variables. Now, you are asked to classify S given observations only for the so-called Markov blanket of S, i.e. its parents plus its children plus the parents of its children minus S itself. Report again the confusion matrix.
+
+Hint: You may want to use the function `mb` from the `bnlearn` package.
+
+```{r echo=FALSE}
+
+# ------------------------------------------------------------------------------
+# Assignment 3
+# ------------------------------------------------------------------------------
+
+```
+
+***
+
+**Exact inference**
+
+Note: This time we only use *Exact inference*.
+
+The confusion matrix looks exactly the same as before. This seems expected
+since variables that are not in the Markov blanket of `S` only have a rather small
+relationship with `S` and hence don't help with the classification.
+
+
+```{r echo = TRUE}
+
+# Fit the structure (given data set)
+dag = hc(df_tr, restart=10, score='bic')
+
+# Fit the parameters (given structure and data set)
+dag_fitted = bn.fit(dag, df_tr, method='mle')
+
+# Make predictions
+res = predict_exact(dag_fitted, df_te, "S", markov = TRUE)
+Y_true = res$Y_true
+Y_pred = res$Y_pred
+
+
+```
+
+```{r}
+
+# Evaluate predictions
+
+cat("Confusion matrix (absolute):\n")
+cm = table(Y_true, Y_pred, dnn = c("True", "Predicted"))
+print(cm)
+asg3_markov = cm
+
+cat("\nConfusion matrix (relative):\n")
+table(Y_true, Y_pred, dnn = c("True", "Predicted"))/N
+
+cat("\nPerformance statistics:\n")
+knitr::kable(analyze_cm(cm, true = "yes"))
+
+```
+
+# Assignment 4: Naive Bayes
+
+Repeat the exercise (2) using a naive Bayes classifier, i.e. the predictive variables are independent given the class variable. See p. 380 in Bishop’s book or Wikipedia for more information on the naive Bayes classifier. Model the naive Bayes classifier as a BN. You have to create the BN by hand, i.e. you are not allowed to use the function `naive.bayes` from the `bnlearn` package.
+
+Hint: Check http://www.bnlearn.com/examples/dag/ to see how to create a BN by hand.
+
+
+```{r echo=FALSE}
+
+# ------------------------------------------------------------------------------
+# Assignment 4
+# ------------------------------------------------------------------------------
+
+```
+
+***
+
+**Review Naive Bayes**
+
+Conditional probability is defined as:
+
+$$P(A|B) = \frac{P(A \cap B)}{P(B)}$$
+$$P(B|A) = \frac{P(A \cap B)}{P(A)}$$
+
+Solving both equations for $P(A \cap B)$ and setting them equal, we get:
+
+$$P(A|B)P(B) = P(B|A)P(A)$$
+$$P(A|B) = \frac{P(B|A)P(A)}{P(B)}$$
+
+Replace A with S and B with X (all other variables):
+
+$$P(S|X) = \frac{P(X|S)P(S)}{P(X)} \propto P(X|S)P(S)$$
+
+Since we have several `X`s and since they are assumed to be independent (recall that independence implies that $P(A, B) = P(A) P(B)$):
+
+$$P(S|X) \propto P(X_1, X_2, ..., X_n|S)P(S) = P(X_1|S)P(X_2|S)...P(X_D|S)P(S) = P(S)\prod_{d=1}^DP(X_d|S)$$
+
+The above tells us that S has to point to all X. Finally, classifications in 
+naive bayes for observation i are done by:
+
+$$\operatorname{argmax}_{S_i} P(S_i)\prod_{d=1}^DP(X_{i, d}|S_i)$$
+
+**Creating network structure**
+
+```{r echo = TRUE}
+
+# S pointing to all variables
+IVs = paste0("[", colnames(df_tr)[-which(colnames(df_tr)=='S')], "|S]", collapse = "")
+naive_bayes = model2network(paste0("[S]", IVs))
+plot(naive_bayes)
+
+```
+
+```{r}
+
+# # All variables pointing to S (wrong)
+# cond = paste0(colnames(df_tr)[-which(colnames(df_tr)=='S')], ":", collapse = "")
+# cond = substr(cond, 1, nchar(cond)-1)
+# IVs = paste0("[", colnames(df_tr)[-which(colnames(df_tr)=='S')], "]", collapse = "")
+# naive_bayes = model2network(paste0("[S|", cond, "]", IVs))
+# plot(naive_bayes)
+
+
+```
+
+
+**Exact inference**
+
+Note: This time we only use *Exact inference*.
+
+The confusion matrix looks exactly the same as before. This seems expected
+since variables that are not in the Markov blanket of `S` only have a rather small
+relationship with `S` and hence don't help with the classification.
+
+```{r echo = TRUE}
+
+# Fit the parameters (given structure and data set)
+dag_fitted = bn.fit(naive_bayes, df_tr, method = 'mle')
+
+# Make predictions
+res = predict_exact(dag_fitted, df_te, "S", markov = TRUE)
+Y_true = res$Y_true
+Y_pred = res$Y_pred
+
+```
+
+```{r}
+
+# Evaluate predictions
+
+cat("Confusion matrix (absolute):\n")
+cm = table(Y_true, Y_pred, dnn = c("True", "Predicted"))
+print(cm)
+asg4_naivebayes = cm
+
+cat("\nConfusion matrix (relative):\n")
+table(Y_true, Y_pred, dnn = c("True", "Predicted"))/N
+
+cat("\nPerformance statistics:\n")
+knitr::kable(analyze_cm(cm, true = "yes"))
+
+```
+
+
+# Assignment 5: Explanation
+
+Explain why you obtain the same or different results in the exercises (2-4).
+
+```{r echo=FALSE}
+
+# ------------------------------------------------------------------------------
+# Assignment 5
+# ------------------------------------------------------------------------------
+
+```
+
+***
+
+Overall, we can see that the differences are very small for asg. 2-3. It seems
+like the nodes that are not in the markov blanket don't provide incremental value
+in the classification. This is because all variables outside the markov blanket
+are conditionally independent of `S` when conditioned on `MB(S)`, the markov blanket
+of `S` (https://en.wikipedia.org/wiki/Markov_blanket).
+
+The result with naive bayes asg. 4 sticks out. This is because it assumes independence
+between all the features which is a strong assumption that does not seem to be fulfilled.
+This is reflected in the fact that the structures learned in asg. 2-3 look very different.
+Therefore, the results are slightly worse for naive bayes.
+
+```{r}
+
+print("asg2_exact")
+asg2_exact
+
+print("asg2_approx")
+asg2_approx
+
+print("asg2_true")
+asg2_true
+
+print("asg3_markov")
+asg3_markov
+
+print("asg4_naivebayes")
+asg4_naivebayes
+
+```
+
+
+```{r}
+
+knitr::kable(round(rbind(asg2_exact = analyze_cm(asg2_exact, true = "yes"), 
+      asg2_approx = analyze_cm(asg2_approx, true = "yes"), 
+      asg2_true = analyze_cm(asg2_true, true = "yes"), 
+      asg3_markov = analyze_cm(asg3_markov, true = "yes"), 
+      asg4_naivebayes = analyze_cm(asg4_naivebayes, true = "yes")), 4))
+    
+
+```
+
+
+# Appendix
+
+```{r, ref.label = knitr::all_labels(), echo = TRUE, eval = FALSE}
+
+```
