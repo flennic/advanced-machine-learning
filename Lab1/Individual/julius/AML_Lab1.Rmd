@@ -29,13 +29,12 @@ knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE,
                       )
 
 set.seed(12345)
-library(ggplot2)
-options(kableExtra.latex.load_packages = FALSE)
-library(kableExtra)
-
 options(scipen=999)
 
-# Prepare packages
+# General libraries
+library(ggplot2)
+
+# Specific packages
 library("bnlearn") # ls('package:bnlearn') # to show all functions
 library("gRain")
 library('RBGL')
@@ -78,7 +77,7 @@ The purpose of the lab is to put in practice some of the concepts covered in the
 
 (1) Show that multiple runs of the hill-climbing algorithm can return non-equivalent Bayesian network (BN) structures. Explain why this happens. Use the Asia dataset which is included in the bnlearn package. To load the data, run data("asia").
 
-Hint: Check the function `hc` in the `bnlearn` package. Note that you can specify the initial structure, the number of random restarts, the score, and the equivalent sam- ple size (a.k.a imaginary sample size) in the BDeu score. You may want to use these options to answer the question. You may also want to use the functions plot, `arcs`, `vstructs`, `cpdag` and `all.equal`.
+Hint: Check the function `hc` in the `bnlearn` package. Note that you can specify the initial structure, the number of random restarts, the score, and the equivalent sample size (a.k.a imaginary sample size) in the BDeu score. You may want to use these options to answer the question. You may also want to use the functions plot, `arcs`, `vstructs`, `cpdag` and `all.equal`.
 
 ***
 
@@ -100,37 +99,126 @@ head(df)
 
 ```
 
+**Definition: Equivalence**
 
-**Object of change**
+Two DAGs represent the same independencies (i.e. they are equivalent) if and 
+only if they have the same adjacencies and unshielded colliders, i.e. subgraphs
+$X_i \rightarrow X_k \leftarrow X_j$, where $X_i$ and $X_j$ are not adjacent
+(Lecture 4).
 
-- A change in direction of certain arrows (i.e. relations) was the main change that was observed.
-- When the score criterion changed, some arrows appeared/disappeared completely.
+**How to show non-equivalence**
 
-**Reason for changes**
+We can test if two DAGs are equivalent by testing if their CPDAGs 
+(=complete partially directed graphs) are the same. If they are, 
+we have equivalent DAGs. If they are not, we have non-equivalent DAGs.
 
-According to the documentation, `Hill-Climbing (hc)` is a `a hill climbing greedy search that explores the space of the directed acyclic graphs by single-arc addition, removal and reversals; with random restarts to avoid local optima. The optimized implementation uses score caching, score decomposability and score equivalence to reduce the number of duplicated tests.` Hence, the reasons for non-equivalent BN structures are:
+For this we can use the function `cpdag`. The function `cpdag` converts certain 
+directed connections in the network to undirected connections. It does this for 
+all connections in the subgraphs that form a class of equivalence (see below). 
+The subgraphs below are all converted to $X_i - X_k - X_j$.
 
-- *random restarts*: If different initial starting points are found, the algorithm may get stuck in (different) local optima. The parameter `restart` has to be larger than 0 to allow this variation.
-- *same scores*: The example below shows that non-equivalent BNs can have the same score (e.g. BIC score). Hence, the algorithm has no incentive to prioritze the one or the other of these non-equivalent BNs.
-- *different scores metrics*: If different evaluation criteria are used e.g. BIC vs. AIC, the space of the DAGs is explored differently and hence, different results are possible.
+- $X_i \leftarrow  X_k \leftarrow X_j$
+- $X_i \rightarrow  X_k \rightarrow X_j$
+- $X_i \leftarrow  X_k \rightarrow X_j$
 
-\newpage 
+The function `cpdag` leaves colliders as they are. I.e.  $X_i \rightarrow  X_k \leftarrow X_j$
+is left as is. Since all adjacencies and unshielded colliders are kept in the 
+DAG when applying the function, we only need to compare the two dags
+after taking their `cpdag` version. If they are different, then obviously 
+we have non-equivalent graphs by the definition of equivalence.
 
-**Example 1 (random restarts)**
+**Non-equivalence due to different score metrics**
 
-In the example below, we set `restart=10` and we can see that the arrow
-points from L to S vs. from S to L in the two diagrams.
+Below, we use `hc` one time with `score='bic'` and one time with `score='aic'`.
+We can see that the 2 resulting dags are *not equivalent* by comparing the 
+arcs in their CPDAGs and finding that they differ. 
 
 ```{r echo = TRUE}
 
+# Non-equivalence due to different score metrics -------------------------------
+
 # Train models
+set.seed(12345)
 res1 = hc(df, restart=10, score='bic')
-res2 = hc(df, restart=10, score='bic')
+res2 = hc(df, restart=10, score='aic')
+# cat("Score", bnlearn::score(res, df)) # smaller AIC, BIC is better
+
+# Check equivalence: logically
+arcs1 = arcs(cpdag(res1))
+arcs2 = arcs(cpdag(res2))
+identical(arcs1[order(arcs1[, 1]), ], arcs2[order(arcs2[, 1]), ])
+
+# Check equivalence: visually
+par(mfrow = c(1, 2))
+graphviz.compare(cpdag(res1), cpdag(res2), main = c("BIC", "AIC"))
+
+```
+
+**Non-equivalence due to different initial random graphs**
+
+Below, we use `hc` two times, on different initial randomly generated graphs.
+We can see that the 2 resulting dags are *not equivalent* by comparing the 
+arcs in their CPDAGs and finding that they differ.  
+
+```{r echo = TRUE}
+
+# Non-equivalence due to different initial random graphs -----------------------
+
+# Train models
+set.seed(12345)
+rand = random.graph(colnames(df))
+res1 = hc(asia, start = rand, restart = 100, score='bic')
+rand = random.graph(colnames(df))
+res2 = hc(asia, start = rand, restart = 100, score='bic')
+
+# Check equivalence: logically
+arcs1 = arcs(cpdag(res1))
+arcs2 = arcs(cpdag(res2))
+identical(arcs1[order(arcs1[, 1]), ], arcs2[order(arcs2[, 1]), ])
+
+# Check equivalence: visually
+par(mfrow = c(1, 2))
+graphviz.compare(cpdag(res1), cpdag(res2), main = c("BIC", "AIC"))
 
 ```
 
 
-```{r echo = FALSE}
+**Non-equivalence due to different iss (imaginary sample size)**
+
+Below, we use `hc` two times: with `iss = 20` and with `iss = 200`.
+We can see that the 2 resulting dags are *not equivalent* by comparing the 
+arcs in their CPDAGs and finding that they differ. To be clear, the network
+learned with a smaller iss is more sparse than the network with a larger iss.
+In general, iss serves as a regularization parameter with larger iss resulting
+in less regularization and therefore less sparse networks.
+
+```{r echo = TRUE}
+
+# Train models
+set.seed(12345)
+res1 = hc(asia, restart = 10, score = 'bde', iss = 20)
+res2 = hc(asia, restart = 10, score = 'bde', iss = 200)
+# cat("Score", bnlearn::score(res, df)) # smaller AIC, BIC is better
+
+# Check equivalence: logically
+arcs1 = arcs(cpdag(res1))
+arcs2 = arcs(cpdag(res1))
+identical(arcs1[order(arcs1[, 1]), ], arcs2[order(arcs2[, 1]), ])
+
+# Check equivalence: visually
+par(mfrow = c(1, 2))
+graphviz.compare(cpdag(res1), cpdag(res2), main = c("BIC", "AIC"))
+
+```
+
+
+```{r echo = FALSE, eval = FALSE}
+
+# Old solution Asg. 1 (eval = FALSE) -------------------------------------------
+
+# Train models
+res1 = hc(df, restart=10, score='bic')
+res2 = hc(df, restart=10, score='bic')
 
 # Overview and scores
 all.equal(res1, res2)
@@ -152,7 +240,7 @@ cat('Same Skeleton:', all.equal(skeleton(res1), skeleton(res2)))
 cat("Hamming distance (zero if same skeleton):", hamming(res1, res2))
 cat("Struct. hamming distance:", shd(res1, res2))
 
-# Other ------------------------------------------------------------------------
+# Other ----------
 
 # # Create individual plots for each dag
 # plot(res1)
@@ -168,42 +256,13 @@ cat("Struct. hamming distance:", shd(res1, res2))
 # cpdag(res1)
 # cpdag(res2)
 
-```
+# Alternatives ----------
 
-**Example 2 (different scores metrics: aic)**
-
-After using `aic`, we see that the resulting networks looks very different than the above networks (comparison to the 2nd network from above). This time, also the score differs since a different score metric was used for training.
-
-```{r echo = TRUE}
-
-res3 = hc(df, restart=10, score='aic')
+# rand = random.graph(colnames(df))
+# res4 = hc(asia, start = rand)
 
 ```
 
-```{r echo = FALSE}
-
-cat("Score BN 3: ", bnlearn::score(res3, df)) # smaller AIC is better
-
-par(mfrow = c(1, 2))
-graphviz.compare(res2, res3, main = c("Run 2 (with BIC)", "Run 3 (with AIC)"))
-
-```
-
-
-**Alternatives**
-
-We can also randomly initialize a graph and run `hc`. If we do this several times, 
-we may also notice different structures due to to different random starting points. 
-They may cause the heuristic algorithm to get stuck in different local optima.
-If we were to then increase the `restart` parameter from e.g. 1 to 1000, we 
-still get the same result because `hc` (likely) manages to find the global optimum.
-
-```{r echo = TRUE}
-
-rand = random.graph(colnames(df))
-res4 = hc(asia, start = rand)
-
-```
 
 **References**
 
@@ -353,7 +412,7 @@ print(cm)
 asg2_exact = cm
 
 cat("\nConfusion matrix (relative):\n")
-table(Y_true, Y_pred, dnn = c("True", "Predicted"))/N
+cm/sum(cm)
 
 cat("\nPerformance statistics:\n")
 knitr::kable(analyze_cm(cm, true = "yes"))
@@ -429,7 +488,7 @@ print(cm)
 asg2_approx = cm
 
 cat("\nConfusion matrix (relative):\n")
-table(Y_true, Y_pred, dnn = c("True", "Predicted"))/N
+cm/sum(cm)
 
 cat("\nPerformance statistics:\n")
 knitr::kable(analyze_cm(cm, true = "yes"))
@@ -478,7 +537,7 @@ print(cm)
 asg2_true = cm
 
 cat("\nConfusion matrix (relative):\n")
-table(Y_true, Y_pred, dnn = c("True", "Predicted"))/N
+cm/sum(cm)
 
 cat("\nPerformance statistics:\n")
 knitr::kable(analyze_cm(cm, true = "yes"))
@@ -542,7 +601,7 @@ print(cm)
 asg3_markov = cm
 
 cat("\nConfusion matrix (relative):\n")
-table(Y_true, Y_pred, dnn = c("True", "Predicted"))/N
+cm/sum(cm)
 
 cat("\nPerformance statistics:\n")
 knitr::kable(analyze_cm(cm, true = "yes"))
@@ -645,7 +704,7 @@ print(cm)
 asg4_naivebayes = cm
 
 cat("\nConfusion matrix (relative):\n")
-table(Y_true, Y_pred, dnn = c("True", "Predicted"))/N
+cm/sum(cm)
 
 cat("\nPerformance statistics:\n")
 knitr::kable(analyze_cm(cm, true = "yes"))
