@@ -98,7 +98,7 @@ score(bayes_net1_hc, asia)
 
 This time the score has not been updated, as we're *stuck* in the the same local optima.
 
-What we can do is use the parameters `restart` and and `perturb`. According to the documentation and the [source code](https://rdrr.io/cran/bnlearn/src/R/hill-climbing.R) the parameters `perturb` specifies how many edges or nodes (in this terminology *arcs*) to change after each restart, the default is one. The parameter `restart` specifies how often to do that. This usually results in slightly better graphs. If `perturb = 1` all combinations are quickly investigated and a different for `restart` does not really matter that much any more:
+What we can do is use the parameters `restart` and `perturb`. According to the documentation and the [source code](https://rdrr.io/cran/bnlearn/src/R/hill-climbing.R) the parameters `perturb` specifies how many edges or nodes (in this terminology *arcs*) to change after each restart, the default is one. The parameter `restart` specifies how often to do that. This usually results in slightly better graphs. If `perturb = 1` all combinations are quickly investigated and a different for `restart` does not really matter that much any more:
 
 ```{r}
 
