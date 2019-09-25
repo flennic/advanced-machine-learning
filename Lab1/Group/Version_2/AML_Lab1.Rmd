@@ -16,8 +16,9 @@ header-includes:
 - \usepackage{cancel}
 fontsize: 12pt
 geometry: margin = 0.8in
-author: Julius Kittler (julki092)
-date: September 17, 2019
+author: G. Hari Prasath (hargo729), Julius Kittler (julki092), Hector Plata (hecpl268)
+  and Maximilian Pfundstein (maxpf364)
+date: September 25, 2019
 ---
 
 ```{r setup, echo = TRUE, include=TRUE, results='hide', message=FALSE, warning=FALSE}
@@ -459,11 +460,7 @@ for (i in 1:N){
   x = vapply(df_te[i, colnames(df_te) != 'S'], as.character, character(1))
   
   for (j in 1:length(Y_space)){
-    #var_names = names(x)
-    #var_values = x
     Y_prob[j] = cpquery(dag_fitted, event = (S == Y_space[j]), 
-                        # evidence = setEvidence(junction, nodes = var_names, 
-                        #                        states = var_values)
                           evidence = ((A == x['A']) & (T == x['T'])
                                       & (L == x['L']) & (B == x['B'])
                                       & (E == x['E']) & (X == x['X'])
@@ -734,7 +731,8 @@ of `S` (https://en.wikipedia.org/wiki/Markov_blanket).
 
 The result with naive bayes asg. 4 sticks out. This is because it assumes independence
 between all the features which is a strong assumption that does not seem to be fulfilled.
-This is reflected in the fact that the structures learned in asg. 2-3 look very different. Therefore, the results are slightly worse for naive bayes.
+This is reflected in the fact that the structures learned in asg. 2-3 look very different.
+Therefore, the results are slightly worse for naive bayes.
 
 ```{r}
 
