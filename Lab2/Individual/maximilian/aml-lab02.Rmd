@@ -21,6 +21,7 @@ output:
 library(HMM)
 library(ggplot2)
 library(entropy)
+library(reshape2)
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
@@ -118,6 +119,25 @@ hmm_viterbi
 
 ```
 
+The visualization for the smoothed path (distributions) looks like this:
+
+```{r, echo=FALSE}
+
+ggplot(data = melt(smoothed_automatically),
+       aes(y=states, x=index, fill=value)) + 
+       geom_raster()
+
+```
+
+The visualization for the filtered path (distributions) looks like this:
+
+```{r, echo=FALSE}
+
+ggplot(data = melt(filtered),
+       aes(y=states, x=index, fill=value)) + 
+       geom_raster()
+
+```
 
 # Filtered and Smoothed Probability Distributions and Most Probable Path
 
@@ -273,7 +293,6 @@ ggplot(df) +
 post = transProbs %*% filtered[,100]
 rownames(post) = names(filtered[,100])
 post
-#t(transProbs) %*% filtered[,100] # Not this, or?!
 
 ```
 
