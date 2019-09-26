@@ -1,0 +1,651 @@
+---
+title: "732A96: AML - Computer Lab 2"
+classoption: table
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 1
+    number_sections: true
+    fig_width: 7
+    fig_height: 4
+    highlight: tango
+fontsize: 12pt
+geometry: margin = 0.8in
+author: Julius Kittler (julki092)
+date: September 21, 2019
+---
+
+
+```{r setup, include=TRUE, results='hide', message=FALSE, warning=FALSE}
+
+# Set up general options
+
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE, 
+                      fig.width=6, fig.height=5#, collapse=TRUE
+                      )
+
+set.seed(12345)
+options(scipen=999)
+
+# General libraries
+library(ggplot2)
+library(dplyr)
+
+# Specific packages
+library(HMM) # ls('package:HMM') # to show all functions
+library(entropy)
+
+```
+
+```{r}
+
+# Auxilary functions
+analyze_cm = function(cm, true){
+  
+  stopifnot(true %in% colnames(cm))
+  levels = c(true, colnames(cm)[-which(colnames(cm) == true)]) # ORDER: 1; 0 
+  cm = as.data.frame(cm); colnames(cm)[1:2] = c("True", "Pred")
+  N = sum(cm$Freq)
+  Npos = sum(cm$Freq[which(cm$True == levels[1])])
+  Nneg = sum(cm$Freq[which(cm$True == levels[2])])
+  TP = sum(cm$Freq[which(cm$True == levels[1] & cm$Pred == levels[1])])
+  TN = sum(cm$Freq[which(cm$True == levels[2] & cm$Pred == levels[2])])
+  FP = sum(cm$Freq[which(cm$True == levels[2] & cm$Pred == levels[1])])
+  
+  FN = sum(cm$Freq[which(cm$True == levels[1] & cm$Pred == levels[2])])
+  return(data.frame(MCR = (FP+FN)/N, Accuracy = (TP + TN)/N, 
+                    Recall = TP/Npos, # recall = TPR = sensitivity,
+                    Precision = TP/(TP + FP),
+                    FPR = FP/Nneg, TNR = TN/Nneg)) # TNR = specificity
+}
+
+# cm = table(Y_true, Y_pred, dnn = c("True", "Predicted"))
+# knitr::kable(analyze_cm(cm, true = "yes"))
+
+```
+
+```{r}
+
+# Rstudio guide
+
+## Setup
+#```{r setup, include=TRUE, results='hide', message=FALSE, warning=FALSE}
+#```
+
+## Appendix
+# ```{r, ref.label = knitr::all_labels(), echo = TRUE, eval = FALSE}
+#```
+
+## Add image
+#```{r label, out.height = "400px", out.width = "800px"}
+#knitr::include_graphics("image.png")
+#```
+
+## Add image
+#![Caption for the picture.](/path/to/image.png)
+
+```
+
+***
+
+# Assignment 1: Implementation of Hidden Markov Model
+
+```{r echo=FALSE}
+
+# ------------------------------------------------------------------------------
+# Assignment 1
+# ------------------------------------------------------------------------------
+```
+
+The purpose of the lab is to put in practice some of the concepts covered in the lectures. To do so, you are asked to model the behavior of a robot that walks around a ring. The ring is divided into 10 sectors. At any given time point, the robot is in one of the sectors and decides with equal probability to stay in that sector or move to the next sector. You do not have direct observation of the robot. However, the robot is equipped with a tracking device that you can access. The device is not very accurate though: If the robot is in the sector i, then the device will report that the robot is in the sectors $[i - 2, i + 2]$ with equal probability.
+
+Build a hidden Markov model (HMM) for the scenario described above.
+
+***
+
+```{r echo = TRUE}
+
+# Prepare hidden states
+States = as.character(1:10)
+
+# Prepare observed values
+Symbols = as.character(1:10)
+
+# Prepare start probabilities
+startProbs = rep(1/10, 10)
+
+# Prepare transProbs: either stay in state (1/2) or move to next state (1/2)
+m = diag(10)*1/2 # stay in state with 1/2
+m[row(m)+1 == col(m)] = 1/2 # move to next state with 1/2
+m[10, 1] = 1/2 # at state 10, we can also move to state 1
+transProbs = m
+
+# Prepare emissionProbs: [i-2, i+2] with equal probabilities (1/5)
+m = diag(10)*1/5
+m[row(m)-2 == col(m)] = 1/5
+m[row(m)-1 == col(m)] = 1/5
+m[row(m)+1 == col(m)] = 1/5
+m[row(m)+2 == col(m)] = 1/5
+
+m[row(m)+8 == col(m)] = 1/5 
+m[row(m)+9 == col(m)] = 1/5 
+m[row(m)-8 == col(m)] = 1/5 
+m[row(m)-9 == col(m)] = 1/5 
+emissionProbs = m
+  
+# Initialize HMM
+hmm = initHMM(States = States, 
+              Symbols = Symbols, 
+              transProbs = transProbs, 
+              startProbs = startProbs, 
+              emissionProbs = emissionProbs)
+print(hmm)
+
+```
+
+```{r eval = FALSE}
+
+# Alternative Emission Probabilities (eval = FALSE) ----------------------------
+
+emissionProbs = matrix(0, ncol = N, nrow = 10)
+
+# 0.2 For i-2 to i+2
+for (i in 1:N) {
+  for (j in c(3:-1)) {
+    emissionProbs[((i-j)%%N)+1,i] = 0.2
+  }
+}
+
+emissionProbs
+
+```
+
+# Assignment 2: Simulation
+
+```{r echo=FALSE}
+
+# ------------------------------------------------------------------------------
+# Assignment 2
+# ------------------------------------------------------------------------------
+```
+
+Simulate the HMM for 100 time steps.
+
+***
+
+```{r echo=TRUE}
+
+set.seed(12345)
+sample = simHMM(hmm, 100)
+sample
+
+```
+
+
+# Assignment 3: Filtered PDF, smoothed PDF and probable path
+
+```{r echo=FALSE}
+
+# ------------------------------------------------------------------------------
+# Assignment 3
+# ------------------------------------------------------------------------------
+```
+
+Discard the hidden states from the sample obtained above. Use the remaining observations to compute the filtered and smoothed probability distributions for each of the 100 time points. Compute also the most probable path.
+
+***
+
+Recall the smoothing and filtering distribution from lecture 5. Essentially, 
+the filtering distribution gives the probabilities of a certain hidden state at 
+time `t` given all observed states until (and including) time `t`. The smoothing
+distribution works retrospectively: It gives the probabilities of a hidden
+state given all observations until `T`, i.e. it uses observations that happened 
+before and observations that happened after `t`.
+
+- *Filtering*: $p(Z^t | x^{0:t}) = \frac{\alpha(Z^t)}{\sum_{z^t}\alpha(z^t)}$
+- *Smoothing*: $p(Z^t | x^{0:T}) = \frac{\alpha(Z^t)\beta(Z^t)}{\sum_{z^t}\alpha(z^t)\beta(z^t)}$
+
+\  
+
+**Compute PDFs**
+
+```{r echo = TRUE, fig.width=7}
+
+# Extract observed values
+x = sample$observation
+
+# Compute filtered and smoothed pdf --------------------------------------------
+alpha = exp(forward(hmm, x)) # forward probabilities (converted from log scale)
+beta = exp(backward(hmm, x)) # backward probabilities (converted from log scale)
+product = alpha * beta # element wise product
+
+# Compute filtered pdf
+pdf_filtered = sweep(alpha, MARGIN = 2, colSums(alpha), `/`) 
+# prop.table(alpha, 2)
+
+# Compute smoothed pdf
+pdf_smoothed = sweep(product, MARGIN = 2, colSums(product), `/`) 
+# posterior(hmm, sim_obs)
+
+# Check that all columns sum up to 1
+if (all(round(colSums(pdf_filtered), 4) == 1) && 
+    all(round(colSums(pdf_smoothed), 4) == 1)){
+  print("All columns sum up to 1")
+} else {
+  print("There is an issue: Not all columns sum up to 1")
+}
+
+```
+
+**Visualize PDFs**
+
+We can see better results for the smoothed pdf, which uses more data
+(also future observations relative to `t`). We can see that its results are
+better because the areas/paths with high probabilites are very slim and clear-cut
+(unlike for the filtered pdf).
+
+```{r}
+
+# Visualize filtered pdf
+gplots::heatmap.2(pdf_filtered,dendrogram='none', Rowv=FALSE, Colv=FALSE,
+                  trace='none', col=viridis::viridis(15, direction = -1), 
+                  main = "Filtered PDF")
+
+# ggplot(data = reshape2::melt(pdf_filtered),
+#        aes(y=states, x=index, fill=value)) + 
+#        geom_raster()
+
+```
+
+```{r}
+
+# Visualize smoothed pdf
+gplots::heatmap.2(pdf_smoothed,dendrogram='none', Rowv=FALSE, Colv=FALSE,
+                  trace='none', col=viridis::viridis(15, direction = -1), 
+                  main = "Smoothed PDF")
+
+# ggplot(data = reshape2::melt(pdf_smoothed),
+#        aes(y=states, x=index, fill=value)) + 
+#        geom_raster()
+
+```
+
+
+**Most probable path**
+
+Essentially, the most probable path should consist of 100 values $\in [1, 10]$ 
+for the hidden variable. We know that there cannot be any jumps: The robot can
+only walk from sector 1 to 2, 2 to 3 etc. It cannot jump e.g. from 1 to 3. We
+also know that there cannot be any walks back to a previous sector since according
+to the question, the robot can either "stay" or "move to the next sector".
+
+From the lecture, we know that the *Forward-Backward Algorithm* is not ideal for
+finding the post probable path because it allows for jumps (see the fuzzy paths
+in the previous heatmaps). In contrast to that, the *Viterbi Algorithm* does not 
+allow for jumps. Instead, it directly computes the most probable path given
+the observations and an HMM. Therefore, we choose to use the `viterbi(hmm, x)`
+function here.
+
+```{r echo = TRUE, fig.height=4}
+
+# Compute most probable path
+path = viterbi(hmm, x)
+path
+
+# Plot most probable path
+plot(path, type = "b", pch = 19, col = "steelblue4", 
+     xlab = "t", ylab = "Hidden State", cex = 0.5)
+
+```
+
+# Assignment 4: Accuracy
+
+```{r echo=FALSE}
+
+# ------------------------------------------------------------------------------
+# Assignment 4
+# ------------------------------------------------------------------------------
+```
+
+Compute the accuracy of the filtered and smoothed probability distributions, and of the most probable path. That is, compute the percentage of the true hidden states that are guessed by each method.
+
+Hint: Note that the function `forward` in the `HMM` package returns probabilities in log scale. You may need to use the functions `exp` and `prop.table` in order to obtain a normalized probability distribution. You may also want to use the functions `apply` and `which.max` to find out the most probable states. Finally, recall that you can compare two vectors A and B elementwise as A==B, and that the function `table` will count the number of times that the different elements in a vector occur in the vector.
+
+***
+
+As expected, the accuracy is higher for the most probable path acc. to the
+smoothed PDF than for the filtered PDF. This is because the smoothed PDF is 
+conditional on all observations (not just until `t`). As we could see in the
+heatmaps before, the paths were more clear cut and therefore any jumps less 
+unlikely.
+
+```{r echo = TRUE}
+
+# Accuracy for filtered PDF
+pred = rownames(pdf_filtered)[apply(pdf_filtered, 2, which.max)]
+accuracy = mean(pred == sample$states)
+cat("\nAccuracy for most probable path acc. to filtered PDF: ", accuracy)
+
+# Accuracy for smoothed PDF
+pred = rownames(pdf_smoothed)[apply(pdf_smoothed, 2, which.max)]
+accuracy = mean(pred == sample$states)
+cat("Accuracy for most probable path acc. to smoothed PDF: ", accuracy)
+
+# Accuracy for smoothed PDF
+accuracy = mean(path == sample$states)
+cat("Accuracy for most probable path acc. to viterbi: ", accuracy)
+
+```
+
+# Assignment 5: Accuracy Comparison
+
+```{r echo=FALSE}
+
+# ------------------------------------------------------------------------------
+# Assignment 5
+# ------------------------------------------------------------------------------
+```
+
+Repeat the previous exercise with different simulated samples. In general, the smoothed distributions should be more accurate than the filtered distributions. Why? In general, the smoothed distributions should be more accurate than the most probable paths, too. Why?
+
+***
+
+**Approach**
+
+Here, we generate samples for 10, 20, ..., 350 observations. For all samples, 
+we compute the accuracies based on smoothed and filtered PDF and based on Viterbi's
+most probable path. Note that a large number of observations leads to numerical
+issues at some point (underflow) when increasing the number of observations further.
+
+**Observations**
+
+- The accuracies of the smoothed distribution seem generally larger than the accuracies of the filtered distribution and the viterbi algorithm
+- It does not seem like there is a consistent improvement of the accuracies over time, even though the accuracies do seem to increase noticeably from N = 10 to N = 100 for the filtered and smoothed distribution.
+
+**Smoothed vs. filtered and viterbi**
+
+The smoothed distribution gives better accuracies than the filtered distribution
+because it is given more information than the filtered distribution: It is 
+conditional on $x^{0:T}$ instead of on $x^{0:t}$.
+
+The smoothed distribution gives better accuracies than the path acc. to viterbi 
+because the viterbi algorithm can only go from state to state (instead of jumping)
+over certain states. Sometimes, this may prevent the algorithm from actually
+suggesting the correct state for a certain step.
+
+```{r echo = TRUE}
+
+get_accuracies = function(n){
+  
+  sample = simHMM(hmm, n)
+  x = sample$observation
+  true = sample$states
+
+  # Compute filtered and smoothed pdf ------------------------------------------
+  alpha = exp(forward(hmm, x)) 
+  beta = exp(backward(hmm, x)) 
+  product = alpha * beta 
+  
+  # Compute filtered pdf
+  pdf_filtered = sweep(alpha, MARGIN = 2, colSums(alpha), `/`)
+  
+  # Compute smoothed pdf
+  pdf_smoothed = sweep(product, MARGIN = 2, colSums(product), `/`)
+  
+  # Compute accuracies ---------------------------------------------------------
+  
+  pred_s = rownames(pdf_smoothed)[apply(pdf_smoothed, 2, which.max)]
+  pred_f = rownames(pdf_filtered)[apply(pdf_filtered, 2, which.max)]
+  pred_v = viterbi(hmm, x)
+  
+  acc = c(mean(pred_s == true), mean(pred_f == true), mean(pred_v == true))
+  names(acc) = c("smoothed", "filtered", "viterbi")
+  
+  return(acc)
+}
+
+```
+
+```{r echo = TRUE}
+
+# Get the values
+set.seed(12345)
+n = seq(10, 350, 10)
+M = vapply(n, get_accuracies, numeric(3))
+colnames(M) = n 
+M = round(M, 4)
+M
+
+```
+
+
+```{r echo = TRUE, fig.width=8}
+
+# Plot the values
+df = as.data.frame(t(M))
+df$N = as.numeric(rownames(df))
+
+df = df %>% tidyr::gather(key = "type", value = "accuracy", -N)
+ggplot(df, aes(x = N, y = accuracy, color = type)) +
+  geom_line() + geom_point() + 
+  labs(title = "Accuracy by Sample Size") + 
+  theme_bw() + theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+
+# Assignment 6: Entropy Comparison
+
+```{r echo=FALSE}
+
+# ------------------------------------------------------------------------------
+# Assignment 6
+# ------------------------------------------------------------------------------
+```
+
+Is it true that the more observations you have the better you know where the robot is?
+
+Hint: You may want to compute the entropy of the filtered distributions with the function
+`entropy.empirical` of the package `entropy`.
+
+***
+
+**Accuracy**
+
+Based on the accuracies from the previous question, we could conclude that more 
+observations do not always help us know better where the robot is. Once a certain
+sample size has been reached (in the example above ca. 100), the accuracy does
+not increase noticeably anymore. 
+
+**Entropy**
+
+Ideally, we want entropy to be as small as possible because then, the distributions 
+would give us high certainty that the robot is at a particular state. Note that
+every column in our filtered and smoothed distribution represents its own 
+distribution for the hidden state at time `t`. Therefore, we have to estimate 
+the entropy for every column of our filtered and smoothed distribution. Our
+main focus here is the filtered distribution since we know that the smoothed
+distribution does not only use information from the past but also from the 
+future. We expect the entropy to slightly decrease with increasing `t` until 
+a certain limit is reached around which it then oscillates.
+
+**Observations**
+
+- The entropy has a burn-in period within approximately $t = 1, 2, ..., 25$. Its maximum is in the very beginning at $t=1$. 
+- After the burn-in period, the entropy does not seem to decrease noticeably anymore. Instead, it oscillates noticeably.
+- The smoothed distribution generally has a smaller entropy than the filtered distribution which is expected since it uses the information from all $t$.
+
+**Interpretation**
+
+Overall, we have a random process. This means that we generally can't be fully
+certain about the underlying states consistently. Hence, it makes sense that
+after some burn-in period the entropy won't decrease noticeably anymore and the
+accuracy won't increase noticeably anymore either.
+
+```{r echo=TRUE}
+
+# New solution with entropies for each t (eval = FALSE) ------------------------
+
+N = 300
+sample = simHMM(hmm, N)
+x = sample$observation
+true = sample$states
+
+# Compute filtered and smoothed pdf 
+alpha = exp(forward(hmm, x)) 
+beta = exp(backward(hmm, x)) 
+product = alpha * beta 
+
+pdf_filtered = sweep(alpha, MARGIN = 2, colSums(alpha), `/`)
+pdf_smoothed = sweep(product, MARGIN = 2, colSums(product), `/`)
+
+# Compute entropy for filtered and smoothed pdf at each t
+entropy_s = apply(pdf_smoothed, 2, entropy::entropy.empirical)
+entropy_f = apply(pdf_filtered, 2, entropy::entropy.empirical)
+
+# Plot the entropy
+df_plot = data.frame(smoothed = entropy_s, filtered = entropy_f, t = 1:N)
+df_plot = df_plot %>% tidyr::gather(key = "type", value = "entropy", -t)
+ggplot(df_plot, aes(x = t, y = entropy, color = type)) +
+  geom_line() + geom_point(size = 0.3) + 
+  labs(title = "Entropy by t") + 
+  theme_bw() + theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+```{r echo = FALSE, eval = FALSE}
+
+# Old solution with entropy averages across all t (eval = FALSE) ---------------
+
+get_entropies = function(n){
+  
+  sample = simHMM(hmm, n)
+  x = sample$observation
+  true = sample$states
+
+  # Compute filtered and smoothed pdf ------------------------------------------
+  alpha = exp(forward(hmm, x)) 
+  beta = exp(backward(hmm, x)) 
+  product = alpha * beta 
+  
+  # Compute filtered pdf
+  pdf_filtered = sweep(alpha, MARGIN = 2, colSums(alpha), `/`)
+  
+  # Compute smoothed pdf
+  pdf_smoothed = sweep(product, MARGIN = 2, colSums(product), `/`)
+  
+  # Compute entropies ----------------------------------------------------------
+  
+  entropy_s = mean(apply(pdf_smoothed, 2, entropy::entropy.empirical))
+  entropy_f = mean(apply(pdf_filtered, 2, entropy::entropy.empirical))
+  
+  entropies = c(entropy_s, entropy_f)
+  names(entropies) = c("smoothed", "filtered")
+  
+  return(entropies)
+}
+
+
+# Get the values
+n = seq(50, 350, 50)
+M = vapply(n, get_entropies, numeric(2))
+colnames(M) = n 
+M = round(M, 4)
+M
+
+# Plot the values
+df = as.data.frame(t(M))
+df$N = as.numeric(rownames(df))
+
+df = df %>% tidyr::gather(key = "type", value = "entropy", -N)
+ggplot(df, aes(x = N, y = entropy, color = type)) +
+  geom_line() + geom_point() + 
+  labs(title = "Avg. entropy by Sample Size") + 
+  theme_bw() + theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+# Assignment 7: Probabilities of hidden states
+
+```{r echo=FALSE}
+
+# ------------------------------------------------------------------------------
+# Assignment 7
+# ------------------------------------------------------------------------------
+```
+
+Consider any of the samples above of length 100. Compute the probabilities of the hidden states for the time step 101.
+
+***
+
+We are looking for $p(Z^{t+1}|x^{0:T})$.
+
+We don't know $Z^t$ but we have the smoothed and filtered distribution for $Z^t$. 
+Multiplying this distribution with the transition matrix will give us $p(Z^{t+1}|x^{0:T})$.
+Note that in this case, it does not matter whether we use the smoothed or the
+filtered distribution.
+
+**Prepare smoothed and filtered distribution**
+
+```{r echo = TRUE}
+
+n = 100
+set.seed(12345)
+sample = simHMM(hmm, n)
+x = sample$observation
+
+# Compute filtered and smoothed pdf 
+alpha = exp(forward(hmm, x)) 
+beta = exp(backward(hmm, x)) 
+product = alpha * beta 
+
+pdf_filtered = sweep(alpha, MARGIN = 2, colSums(alpha), `/`)
+pdf_smoothed = sweep(product, MARGIN = 2, colSums(product), `/`)
+
+# Check if they are identical for t = T
+if (all(pdf_smoothed[, n] == pdf_filtered[, n])){
+  print("pdf_smoothed and pdf_filtered are identical for t = T = 100")
+} else {
+  print("There is an issue: pdf_smoothed and pdf_filtered are not identical")
+}
+
+```
+
+**Compute p(Z^{t+1}|x^{0:T})**
+
+```{r echo=TRUE}
+
+# Compute and print p(Z^{t+1}|x^{0:T})
+Z_tp1 = transProbs %*% pdf_smoothed[, n]
+rownames(Z_tp1) = States
+Z_tp1
+
+# Plot p(Z^{t+1}|x^{0:T})
+plot(Z_tp1, type = "b", pch = 19, col = "steelblue4", 
+     xlab = "t", ylab = "P(Z^{t+1})", cex = 0.5, 
+     main = paste0("Most probable Z^{t+1}: ", names(Z_tp1[which.max(Z_tp1), ])))
+
+# Print most probable state
+names(Z_tp1[which.max(Z_tp1), ])
+
+```
+
+
+```{r eval=FALSE}
+
+# Estimate the transition probabilities (eval = FALSE) -------------------------
+path = rownames(pdf_smoothed)[apply(pdf_smoothed, 2, which.max)]
+M = data.frame(Z_tp1 = path[2:n], Z_t = path[1:(n-1)])
+M = table(as.numeric(M$Z_tp1), as.numeric(M$Z_t))
+
+transitionEstimate = round(sweep(M, MARGIN = 2, rowSums(M), `/`), 4)
+transitionEstimate
+
+```
+
+
+
+# Appendix
+
+```{r, ref.label = knitr::all_labels(), echo = TRUE, eval = FALSE}
+```
