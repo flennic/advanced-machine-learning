@@ -88,6 +88,7 @@ particle_filter = function(observations, T=100, M=100, sd_emission=1, corr=TRUE)
   Z = vector(length = T)
   
   for (t in 1:T) {
+    
     if (t == 1) {
       # Initialization
       X_temp = rinit(M)
@@ -98,7 +99,6 @@ particle_filter = function(observations, T=100, M=100, sd_emission=1, corr=TRUE)
       # Prediction
       X_bar[t,] = sapply(X[t-1,], rtransition)
     }
-    
     
     # Importance Weight
     W[t, ] = sapply(X_bar[t,], demission, z_t = observations[t], sd=sd_emission)
