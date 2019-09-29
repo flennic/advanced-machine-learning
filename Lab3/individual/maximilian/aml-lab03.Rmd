@@ -1,0 +1,56 @@
+---
+title: "Advanced Machine Learning - Lab 03"
+author: "G. Hari Prasath (hargo729), Julius Kittler (julki029), Hector Plata (hecpl268) and Maximilian Pfundstein (maxpf364)"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 3
+  word_document:
+    toc: yes
+    toc_depth: '3'
+  html_document:
+    df_print: paged
+    number_sections: no
+    toc: yes
+    toc_float: no
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The purpose of the lab is to put in practice some of the concepts covered in the lectures. To do so, you are asked to implement the particle filter for robot localization. For the particle filter algorithm, please check Section 13.3.4 of Bishop’s book and/or the slides for the last lecture on state space models (SSMs). The robot moves along the horizontal axis according to the following SSM:
+
+**Transition Model:**
+
+$$p(z_t|t_{t-1}) = \frac{\mathcal{N}(z_t|z_{t-1}, 1) + \mathcal{N}(z_t|z_{t-1} +1, 1) + \mathcal{N}(z_t|z_{t-1} + 2, 1)}{3}$$
+
+**Emission Model:**
+
+$$p(x_t|z_t) = \frac{\mathcal{N}(x_t|z_{t}, 1) + \mathcal{N}(x_t|z_{t}-1 ,1) + \mathcal{N}(x_t|z_{t}+1, 1)}{3}$$
+
+**Initial Model:**
+
+$$p(z_1) = \text{Uniform}(0, 100)$$
+
+# Implementing the State Space Model
+
+
+**Task:** Implement the SSM above. Simulate it for $T=100$ time steps to obtain $z_{1:100}$ (i.e.,
+states) and $x_{1:100}$ (i.e., observations). Use the observations (i.e., sensor readings) to identify the state (i.e., robot location) via particle filtering. Use 100 particles. Show the particles, the expected location and the true location for the first and last time steps, as well as for two intermediate time steps of your choice.
+
+# Different Standard Deviations
+
+**Task:** Repeat the exercise above replacing the standard deviation of the emission model with 5 and then with 50. Comment on how this affects the results.
+
+# Omit Correction
+
+**Task:** Finally, show and explain what happens when the weights in the particle filter are always equal to 1, i.e. there is no correction.
+
+# Source Code
+
+```{r, ref.label=knitr::all_labels(), echo = TRUE, eval = FALSE, results = 'show'}
+
+```
