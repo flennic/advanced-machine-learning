@@ -156,12 +156,12 @@ smoothed_max = max.col(t(smoothed_automatically), "first")
 # ACC
 # Smoothed
 confusionMatrix_smoothed = table(simulatedStates$states,
-                        paste(rep("Z", nSim), filtered_max, sep=""))
+                        paste(rep("Z", nSim), smoothed_max, sep=""))
 acc_smoothed = sum(diag(confusionMatrix_smoothed))/sum(confusionMatrix_smoothed)
 
 # Filtered
 confusionMatrix_filtered = table(simulatedStates$states,
-                        paste(rep("Z", nSim), smoothed_max, sep=""))
+                        paste(rep("Z", nSim), filtered_max, sep=""))
 acc_filtered = sum(diag(confusionMatrix_filtered))/sum(confusionMatrix_filtered)
 
 # Viterbi
