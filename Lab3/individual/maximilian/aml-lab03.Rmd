@@ -49,14 +49,14 @@ partice_sample_size = 100 # M
 iterations = 100 # T
 
 rtransition = function(z_t_1, sd=1) {
-  return(sum(rnorm(3, c(0, 1, 2)+z_t_1, sd=sd))/3)
+  return(rnorm(1, sample(c(0,1,2), size=1)+z_t_1, sd=sd))
 }
 
 remission = function(n, z_t, sd=1) {
-  return(sum(rnorm(3, c(0, -1, 1)+z_t, sd=sd))/3)
+  return(rnorm(1, sample(c(0,1,2), size=1)+z_t, sd=sd))
 }
 
-demission = function(x_t, z_t, sd=1){
+demission = function(x_t, z_t, sd=1) {
   return(sum(dnorm(x_t, c(0, -1, 1)+z_t, sd=sd))/3)
 }
 
