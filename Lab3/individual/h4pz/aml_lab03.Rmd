@@ -100,8 +100,8 @@ density_emission = function(z_t, x_t, std=1)
 give_me_plot = function(particle_res, sim_res, title="")
 {
   # Getting the max and min values of the particles and true location.
-  max_z = max(particle_res$Z, sim_res$Z)
-  min_z = min(particle_res$Z, sim_res$Z)
+  max_z = max(particle_res$Z, sim_res$Z, sim_res$X)
+  min_z = min(particle_res$Z, sim_res$Z, sim_res$X)
   
   # Creating the data for the plots.
   time = c()
@@ -127,6 +127,9 @@ give_me_plot = function(particle_res, sim_res, title="")
                     y=sim_res$Z,
                     color="True location")) +
       geom_line(aes(x=1:n_iter,
+                    y=sim_res$X,
+                    color="Observed location")) +
+      geom_line(aes(x=1:n_iter,
                     y=rowMeans(particle_res$Z),
                     color="Expected location")) +
       labs(x="Time step",
@@ -149,7 +152,7 @@ ssm_sim = function(n_iter, n_samples=1, std=1)
   # Simulating the observations and path.
   for (i in 1:n_iter)
   {
-    Z[i + 1] = sample_transition(Z[i], n=n_samples, std=std)
+    Z[i + 1] = sample_transition(Z[i], n=n_samples)
     X[i] = sample_emission(Z[i + 1], n=n_samples, std=std)
   }
   
@@ -170,7 +173,7 @@ particle_filter_01 = function(observations, n_iter=100, n_particles=100, std=1)
     # Prediction.
     # Transition step.
     # Prior belief.
-    Z_bar[t, ] = sapply(Z[t, ], sample_transition, std=std)
+    Z_bar[t, ] = sapply(Z[t, ], sample_transition)
     
     # Getting the weights.
     W[t, ] = sapply(Z_bar[t, ], density_emission, x_t=observations[t], std=std)
@@ -214,7 +217,7 @@ particle_filter_02 = function(observations,
                         replace=TRUE,
                         prob=W[t, ])
     
-    Z[t + 1, ] = sapply(Z[t + 1, ], sample_transition, std=std)
+    Z[t + 1, ] = sapply(Z[t + 1, ], sample_transition)
       
     # Update weights.
     if (correction)
