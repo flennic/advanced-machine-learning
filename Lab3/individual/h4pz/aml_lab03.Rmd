@@ -1,5 +1,5 @@
 ---
-title: "Advanced Machine Learning (732A96) - Lab 02"
+title: "Advanced Machine Learning (732A96) - Lab 03"
 author: "Hector Plata (hecpl268)"
 output:
   pdf_document:
