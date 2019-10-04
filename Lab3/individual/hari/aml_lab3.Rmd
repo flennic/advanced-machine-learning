@@ -210,16 +210,15 @@ particle_filter = function(num_particles, observations, initial_model,
       # Vector for belief set of particles
       bel_particles = vector(mode = "numeric", length = num_particles)
       
-      for(j in 1:num_particles){
-        # Generate belief particle using transition model
-        # z_t^m given z_t-1
-        bel_particles[j] = transition_model(particles[j])
-        
-        if(weight_update){
-          # Calculate weight using emission model probability
-          # probability of x_t given z_t^m
-          w_t[j] = emission_prob(observations[t], bel_particles[j])
-        }
+      # Generate belief particle using transition model
+      # z_t^m given z_t-1
+      bel_particles = sapply(particles, transition_model)
+      
+      if(weight_update){
+        # Calculate weight using emission model probability
+        # probability of x_t given z_t^m
+        w_t = sapply(bel_particles, 
+                     function(b_p) emission_prob(observations[t], b_p))
       }
       
       # Normalize weights
@@ -233,23 +232,21 @@ particle_filter = function(num_particles, observations, initial_model,
     # Method 2
     else{
       # Sample particles from the mixture model of weighted transition models
+      # z_t given x_(1:t-1)
       
       # Sample component mean from particles at time t-1 
-      # using weighted probabilities with replacement
-      # z_(t-1)^m given x_t-1
+      # using weighted probabilities, w_t with replacement
       post_sample = sample(particles, size = num_particles, 
                            prob = w_t, replace = TRUE)
       
-      for(j in 1:num_particles){
-        # Resample particles based on transition model and sampled component mean
-        # z_t given z_t-1
-        particles[j] = transition_model(post_sample[j])
-        
-        if(weight_update){
-          # Calculate weight using emission model probability
-          # probability of x_t given z_t
-          w_t[j] = emission_prob(observations[t], particles[j])
-        }
+      # Resample particles based on transition model and sampled component mean
+      # z_t given z_(t-1)^m
+      particles = sapply(post_sample, transition_model)
+      
+      if(weight_update){
+        # Calculate weight using emission model probability
+        # probability of x_t given z_t^m
+        w_t = sapply(particles, function(p) emission_prob(observations[t], p))
       }
       
       # Normalize weights
@@ -360,7 +357,7 @@ grid.arrange(p5, p6, nrow = 1)
 
 ```
 
-At $T=0$, we sample the particles from the initial model which is $Unif(0, 100)$ with a mean estimate close to 50. But, after resampling at $T=1$, we see that the values closer to the observation get higher weights and hence, are sampled more often. So, the mean estimate has moved from 50 towards the observation value. At higher time steps, we see that the distribution is more concentrated in a smaller range of values and the mean estimate is very close to the true state.
+At $T=0$, we sample the particles from the initial model which is $Unif(0, 100)$ with a mean estimate close to 50. But, after resampling at $T=1$, we see that the values closer to the observation get higher weights and hence, are sampled more often. So, the mean estimate has moved from 50 towards the observation value. At higher time steps, we see that the distribution is more concentrated in a smaller range of values and the mean estimate is very close to the true state (as seen in the residual plots).
 
 ***
 
