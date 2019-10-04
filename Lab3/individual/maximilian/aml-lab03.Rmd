@@ -237,7 +237,7 @@ ggplot(df) +
 - Either the dynamic model does not fit the reality.
 - The reliability of the model is flawed. Either the real variance is higher or lower.
 
-Forcing all draws to have the same probability, does not count in for the correct observed uncertainty and thus makes our model narrower (case two from the bullet points). The reason that we sample with probabilities is to draw from the correct posterior, but as we chance the odds, our MCMC sampling does not give us the desired results. The same behaviour can be seen using a Kalman Filter instead of a Particle Filter.
+Forcing all draws to have the same probability, does not count in for the correct observed uncertainty and thus makes our model narrower (case two from the bullet points). The reason that we sample with probabilities is to draw from the correct posterior, but as we change the odds, our MCMC sampling does not give us the desired results. The same behaviour can be seen using a Kalman Filter instead of a Particle Filter. Also the variance just decreases until a specific point and teh stops getting smaller.
 
 ```{r}
 
