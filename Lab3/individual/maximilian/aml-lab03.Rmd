@@ -40,7 +40,7 @@ $$p(z_1) = \text{Uniform}(0, 100)$$
 # Implementing the State Space Model
 
 **Task:** Implement the SSM above. Simulate it for $T=100$ time steps to obtain $z_{1:100}$ (i.e.,
-states) and $x_{1:100}$ (i.e., observations). Use the observations (i.e., sensor readings) to identify the state (i.e., robot location) via particle filtering. Use 100 particles. Show the particles, the expected location and the true location for the first and last time steps, as well as for two intermediate time steps of your choice.
+states) and $x_{1:100}$ (i.e., observations). Use the observations (i.e., sensor readings) to identify the state (i.e., robot location) via particle filtering. Use $100$ particles. Show the particles, the expected location and the true location for the first and last time steps, as well as for two intermediate time steps of your choice.
 
 ```{r}
 
@@ -82,6 +82,10 @@ sample_observations = function(n, sd_emission=1) {
 
 particle_filter = function(observations, T=100, M=100, sd_emission=1, corr=TRUE) {
   
+  particle_plot_locations = c(1, round(100/3), round(100/3*2), T)
+  
+  particle_df = data.frame(matrix(nrow = M, ncol=length(particle_plot_locations)))
+  
   X = matrix(nrow = T, ncol = M) # Posterior believe
   X_bar = matrix(nrow = T, ncol = M) # Prior believe
   W = matrix(nrow = T, ncol = M)
@@ -115,9 +119,13 @@ particle_filter = function(observations, T=100, M=100, sd_emission=1, corr=TRUE)
     # Taken from Bishop
     Z[t] = as.numeric(W[t, ] %*% X[t, ])
     
+    if (t %in% particle_plot_locations) {
+      particle_df[, match(t, particle_plot_locations)] = X[t,]
+    }
+    
   }
   
-  return(list(X=X, X_bar=X_bar, W=W, Z=Z))
+  return(list(X=X, X_bar=X_bar, W=W, Z=Z, particles=particle_df))
 }
 
 
@@ -152,6 +160,12 @@ ggplot(df) +
        x = "Time", color = "Legend") +
   scale_color_manual(values = c("#C70039", "#FF5733", "#581845")) +
   theme_minimal()
+
+par(mfrow = c(2, 2))
+plot(density(res$particles[,1]), main="Histogram of the first particles")
+plot(density(res$particles[,2]), main="Histogram of the particles at 1/3")
+plot(density(res$particles[,3]), main="Histogram of the first particles at 2/3")
+plot(density(res$particles[,3]), main="Histogram of the last particles")
 
 ```
 
@@ -194,6 +208,12 @@ ggplot(df) +
   scale_color_manual(values = c("#C70039", "#FF5733", "#581845")) +
   theme_minimal()
 
+par(mfrow = c(2, 2))
+plot(density(res$particles[,1]), main="Histogram of the first particles")
+plot(density(res$particles[,2]), main="Histogram of the particles at 1/3")
+plot(density(res$particles[,3]), main="Histogram of the first particles at 2/3")
+plot(density(res$particles[,3]), main="Histogram of the last particles")
+
 ```
 
 ```{r}
@@ -225,6 +245,12 @@ ggplot(df) +
        x = "Time", color = "Legend") +
   scale_color_manual(values = c("#C70039", "#FF5733", "#581845")) +
   theme_minimal()
+
+par(mfrow = c(2, 2))
+plot(density(res$particles[,1]), main="Histogram of the first particles")
+plot(density(res$particles[,2]), main="Histogram of the particles at 1/3")
+plot(density(res$particles[,3]), main="Histogram of the first particles at 2/3")
+plot(density(res$particles[,3]), main="Histogram of the last particles")
 
 ```
 
@@ -269,6 +295,12 @@ ggplot(df) +
        x = "Time", color = "Legend") +
   scale_color_manual(values = c("#C70039", "#FF5733", "#581845")) +
   theme_minimal()
+
+par(mfrow = c(2, 2))
+plot(density(res$particles[,1]), main="Histogram of the first particles")
+plot(density(res$particles[,2]), main="Histogram of the particles at 1/3")
+plot(density(res$particles[,3]), main="Histogram of the first particles at 2/3")
+plot(density(res$particles[,3]), main="Histogram of the last particles")
 
 ```
 
