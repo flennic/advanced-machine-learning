@@ -82,7 +82,7 @@ sample_observations = function(n, sd_emission=1) {
 
 particle_filter = function(observations, T=100, M=100, sd_emission=1, corr=TRUE) {
   
-  particle_plot_locations = c(1, round(100/3), round(100/3*2), T)
+  particle_plot_locations = c(1, round(T/3), round(T/3*2), T)
   
   particle_df = data.frame(matrix(nrow = M, ncol=length(particle_plot_locations)))
   
@@ -117,12 +117,12 @@ particle_filter = function(observations, T=100, M=100, sd_emission=1, corr=TRUE)
     }
     X[t,] = sample(X_bar[t,], M, prob = prob, replace = TRUE)
     # Taken from Bishop
-    Z[t] = as.numeric(W[t, ] %*% X[t, ])
+    #Z[t] = as.numeric(W[t, ] %*% X[t, ])
+    Z[t] = mean(X[t,])
     
     if (t %in% particle_plot_locations) {
       particle_df[, match(t, particle_plot_locations)] = X[t,]
     }
-    
   }
   
   return(list(X=X, X_bar=X_bar, W=W, Z=Z, particles=particle_df))
