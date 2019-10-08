@@ -3,22 +3,23 @@ title: "Advanced Machine Learning - Lab 04"
 author: "G. Hari Prasath (hargo729), Julius Kittler (julki029), Hector Plata (hecpl268) and Maximilian Pfundstein (maxpf364)"
 date: "`r Sys.Date()`"
 output:
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 3
+  word_document:
+    toc: yes
+    toc_depth: '3'
   html_document:
     df_print: paged
     number_sections: no
     toc: yes
     toc_float: no
-  word_document:
-    toc: yes
-    toc_depth: '3'
-  pdf_document:
-    number_sections: yes
-    toc: yes
-    toc_depth: 3
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
 set.seed(12345)
 ```
 
@@ -53,7 +54,7 @@ the course web page).
 #' @param ell Parameter ell.
 #'
 #' @return Returns the squared exponential kernel function applied to X and Y.
-se_kernel = function(x, y, d, ell) {
+se_kernel = function(x, y, d=1, ell=0.3) {
   return(d^2 * exp(-0.5 * (((x-y)/ell)^2)))
 }
 
@@ -69,13 +70,10 @@ cov_kernel = function(X, Y, kernel, ...) {
   if (!is.vector(X) || !is.vector(Y))
     stop("X and Y must be vectors.")
   
-  if (!all(dim(X) == dim(Y)) || length(X) != length(Y))
-    stop("Dimensions of X and Y must be the same.")
-  
   K = matrix(NA, nrow = length(X), ncol = length(Y))
   
   for (i in 1:length(X)) {
-    for (j in 1:i) {
+    for (j in 1:length(Y)) {
       K[i, j] = kernel(X[i], Y[j], ...)
     }
   }
@@ -97,7 +95,7 @@ cov_kernel = function(X, Y, kernel, ...) {
 posteriorGP = function(X, Y, XStar, sigmaNoise, kernel, ...) {
   
   K = t(cov_kernel(X, X, kernel, ...))
-  L = chol(K + diag(sigmaNoise, length(X)))
+  L = t(chol(K + diag(sigmaNoise^2, length(X))))
   
   # Predictive Mean
   alpha = solve(t(L), solve(L, Y))
@@ -106,18 +104,58 @@ posteriorGP = function(X, Y, XStar, sigmaNoise, kernel, ...) {
   
   # Predictive Variance
   V = solve(L, K_star)
-  print(dim(cov_kernel(XStar, XStar, kernel, ...)))
-  print(dim(V %*% t(V)))
-  V_f_star = cov_kernel(XStar, XStar, kernel, ...) - V %*% t(V)
+  V_f_star = cov_kernel(XStar, XStar, kernel, ...) - t(V) %*% V
   
   # Log Marginal Likelihood
   n = length(X)
   
-  lml = sapply(Y, FUN = function(x) {
-    return(-0.5 %*% t(y) %*% alpha - sum(log(diag(L))) - (n/2) * log(2*pi))
-  })
+  lml = -0.5 %*% t(Y) %*% alpha - sum(log(diag(L))) - (n/2) * log(2*pi)
+  
+  gp_object = list(mean=f_star,
+                   variance=V_f_star,
+                   lml = lml,
+                   X=X, Y=Y,
+                   XStar=XStar)
+  
+  class(gp_object) = "gp"
 
-  return(list(mean=f_star, variance=V_f_star, lml = lml))
+  return(gp_object)
+}
+
+#' plot.gp
+#'
+#' @param gp An Gaussian Process ("gp") object.
+#' @param direct_plot TRUE by default. Determines if to plot directly or to
+#'    return the plot.
+#'
+#' @return If direct_plot is set to TRUE, the plot object.
+plot.gp = function(gp, direct_plot=TRUE) {
+  df = data.frame(x = grid,
+                y = gp$mean,
+                y_upper = gp$mean + 1.96*sqrt(diag(gp$variance)),
+                y_lower = gp$mean - 1.96*sqrt(diag(gp$variance)))
+
+  points = data.frame(x = gp$X, y = gp$Y)
+  
+  p = ggplot() +
+  geom_line(aes(x = df$x, y = df$y, colour = "Mean")) +
+  geom_ribbon(aes(x = df$x, ymin = df$y_lower, ymax = df$y_upper), 
+                alpha=0.05,
+                linetype=3,
+                colour="grey70",
+                size=1,
+                fill="black") +
+  geom_point(aes(x = points$x, y = points$y), color = "black",
+          fill = "#FFC300", shape = 21, size = 2, stroke = 1) +
+  labs(title = "Posterior Mean with 95 percent probability interval",
+       y = "Position", x = "Time", color = "Legend") +
+  scale_color_manual(values = c("#C70039", "#FF5733", "#581845")) +
+  theme_minimal()
+  
+  if (!direct_plot)
+    return(p)
+  
+  print(p)
 }
 
 ```
@@ -135,16 +173,38 @@ sigma_n = 0.1
 x = 0.4
 y = 0.719
 
-grid = seq(from=-1, to=1, length.out = 5)
+grid = seq(from=-1, to=1, length.out = 100)
 
 res = posteriorGP(x, y, grid, sigma_n, se_kernel, d=sigma_f, ell=ell)
 
 ```
 
+```{r, echo=FALSE}
+
+plot(res)
+
+```
 
 ## Another Observation
 
 **Task:** Update your posterior from (2) with another observation: $(x,y)=(-0.6,-0.044)$. Plot the posterior mean of $f$ over the interval $x \in [-1, 1]$. Plot also 95 percent probability (pointwise) bands for $f$.
+
+```{r}
+
+x = c(0.4, -0.6)
+y = c(0.719, -0.004)
+res = posteriorGP(x, y, grid, sigma_n, se_kernel, d=sigma_f, ell=ell)
+
+
+```
+
+```{r, echo=FALSE}
+
+plot(res)
+
+```
+
+
 
 **Hint:** Updating the posterior after one observation with a new observation gives the same result as updating the prior directly with the two observations.
 
@@ -154,16 +214,53 @@ res = posteriorGP(x, y, grid, sigma_n, se_kernel, d=sigma_f, ell=ell)
 
 ```{r, echo=FALSE}
 
-res = matrix(c(-1, -0.6, -0.2, 0.4, 0.8, 0.768, -0.044, -0.940, 0.719, -0.664),
-             nrow = 2)
-rownames(res) = c("x", "y")
-res
+x = c(-1, -0.6, -0.2, 0.4, 0.8)
+y = c(0.768, -0.044, -0.940, 0.719, -0.664)
+
+input = matrix(c(x,y), nrow=2, byrow=TRUE)
+rownames(input) = c("x", "y")
+input
 
 ```
+
+```{r}
+
+res = posteriorGP(input[1,], input[2,], grid, sigma_n, se_kernel, d=sigma_f,
+                  ell=ell)
+
+```
+
+```{r, echo=FALSE}
+
+plot(res)
+
+```
+
+
 
 ## Different Hypterparameters
 
 **Task:** Repeat (4), this time with hyperparameters $\sigma_f = 1$ and $\ell = 1$. Compare the results.
+
+**Answer:** Increasing $\ell$ results is a smoother posterior which derives from the kernel function as $\ell$ states which points are considered close and which are not. This enables the function to pass the training points with a larger distance and thus become smoother. We basically want to tune $\ell$ to obtain a model that captures the trend of the data; we can utilise it to prevent possible overfitting. Thereof the parameter $\ell$ is a tradeoff between smoothness and overfit.
+
+Also note that the variance and thus the probability interval for the posterior has been reduced, even thought the parameter $\sigma_n$ has not been touched. This rises from the fact that a smoothed function cannot vary that muched compared to its bumpy counterpart.
+
+```{r}
+
+sigma_f = 1
+ell = 1
+
+res = posteriorGP(x, y, grid, sigma_n, se_kernel, d=sigma_f, ell=ell)
+
+```
+
+```{r, echo=FALSE}
+
+plot(res)
+
+```
+
 
 # $\mathcal{GP}$ Regression with `kernlab`
 
