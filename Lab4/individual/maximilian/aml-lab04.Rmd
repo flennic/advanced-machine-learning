@@ -3,18 +3,18 @@ title: "Advanced Machine Learning - Lab 04"
 author: "G. Hari Prasath (hargo729), Julius Kittler (julki029), Hector Plata (hecpl268) and Maximilian Pfundstein (maxpf364)"
 date: "`r Sys.Date()`"
 output:
-  pdf_document:
-    number_sections: yes
-    toc: yes
-    toc_depth: 3
-  word_document:
-    toc: yes
-    toc_depth: '3'
   html_document:
     df_print: paged
     number_sections: no
     toc: yes
     toc_float: no
+  word_document:
+    toc: yes
+    toc_depth: '3'
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 3
 ---
 
 ```{r setup, include=FALSE}
@@ -43,9 +43,104 @@ You must implement Algorithm 2.1 on page 19 of Rasmussen and Willams’ book. Th
 **Hint:** Write a separate function for the kernel (see the file `GaussianProcess.R` on
 the course web page).
 
+```{r}
+
+#' se_kernel
+#'
+#' @param x Point X.
+#' @param y Point Y.
+#' @param d Parameter sigma_f.
+#' @param ell Parameter ell.
+#'
+#' @return Returns the squared exponential kernel function applied to X and Y.
+se_kernel = function(x, y, d, ell) {
+  return(d^2 * exp(-0.5 * (((x-y)/ell)^2)))
+}
+
+#' cov_kernel
+#'
+#' @param X 
+#' @param kernel A kernel functions.
+#' @param ... Parameters for the kernel function.
+#'
+#' @return Returns the covariance matrix where the kernel is being applied.
+cov_kernel = function(X, Y, kernel, ...) {
+  
+  if (!is.vector(X) || !is.vector(Y))
+    stop("X and Y must be vectors.")
+  
+  if (!all(dim(X) == dim(Y)) || length(X) != length(Y))
+    stop("Dimensions of X and Y must be the same.")
+  
+  K = matrix(NA, nrow = length(X), ncol = length(Y))
+  
+  for (i in 1:length(X)) {
+    for (j in 1:i) {
+      K[i, j] = kernel(X[i], Y[j], ...)
+    }
+  }
+  
+  return(K)
+}
+
+#' posteriorGP
+#'
+#' @param X Vector of training inputs.
+#' @param Y Vector of training targets/outputs.
+#' @param XStar Vector of inputs where the posterior distribution is evaluated,
+#    i.e XStar.
+#' @param sigmaNoise Noise standard deviation sigma_n.
+#' @param kernel A kernel function.
+#' @param ... Parameters for the kernel function.
+#'
+#' @return Vector with the posterior mean and variance of f evaluated on set XStar
+posteriorGP = function(X, Y, XStar, sigmaNoise, kernel, ...) {
+  
+  K = t(cov_kernel(X, X, kernel, ...))
+  L = chol(K + diag(sigmaNoise, length(X)))
+  
+  # Predictive Mean
+  alpha = solve(t(L), solve(L, Y))
+  K_star = cov_kernel(X, XStar, kernel, ...)
+  f_star = t(K_star) %*% alpha
+  
+  # Predictive Variance
+  V = solve(L, K_star)
+  print(dim(cov_kernel(XStar, XStar, kernel, ...)))
+  print(dim(V %*% t(V)))
+  V_f_star = cov_kernel(XStar, XStar, kernel, ...) - V %*% t(V)
+  
+  # Log Marginal Likelihood
+  n = length(X)
+  
+  lml = sapply(Y, FUN = function(x) {
+    return(-0.5 %*% t(y) %*% alpha - sum(log(diag(L))) - (n/2) * log(2*pi))
+  })
+
+  return(list(mean=f_star, variance=V_f_star, lml = lml))
+}
+
+```
+
 ## Prior Observation
 
 **Task:** Now, let the prior hyperparameters be $\sigma_f=1$ and $\ell=0.3$. Update this prior with a single observation: $(x,y) = (0.4, 0.719)$. Assume that $\sigma_n = 0.1$. Plot the posterior mean of $f$ over the interval $x \in [-1,1]$. Plot also 95 percent probability (pointwise) bands for $f$.
+
+```{r}
+
+sigma_f = 1
+ell = 0.3
+sigma_n = 0.1
+
+x = 0.4
+y = 0.719
+
+grid = seq(from=-1, to=1, length.out = 5)
+
+res = posteriorGP(x, y, grid, sigma_n, se_kernel, d=sigma_f, ell=ell)
+
+```
+
 
 ## Another Observation
 
