@@ -3,24 +3,25 @@ title: "Advanced Machine Learning - Lab 04"
 author: "G. Hari Prasath (hargo729), Julius Kittler (julki029), Hector Plata (hecpl268) and Maximilian Pfundstein (maxpf364)"
 date: "`r Sys.Date()`"
 output:
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 3
+  word_document:
+    toc: yes
+    toc_depth: '3'
   html_document:
     df_print: paged
     number_sections: no
     toc: yes
     toc_float: no
-  word_document:
-    toc: yes
-    toc_depth: '3'
-  pdf_document:
-    number_sections: yes
-    toc: yes
-    toc_depth: 3
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(kernlab)
 library(ggplot2)
+library(AtmRay) # for Meshgrid
 set.seed(12345)
 ```
 
@@ -190,6 +191,8 @@ plot(res)
 
 **Task:** Update your posterior from (2) with another observation: $(x,y)=(-0.6,-0.044)$. Plot the posterior mean of $f$ over the interval $x \in [-1, 1]$. Plot also 95 percent probability (pointwise) bands for $f$.
 
+**Hint:** Updating the posterior after one observation with a new observation gives the same result as updating the prior directly with the two observations.
+
 ```{r}
 
 x = c(0.4, -0.6)
@@ -204,10 +207,6 @@ res = posteriorGP(x, y, grid, sigma_n, se_kernel, d=sigma_f, ell=ell)
 plot(res)
 
 ```
-
-
-
-**Hint:** Updating the posterior after one observation with a new observation gives the same result as updating the prior directly with the two observations.
 
 ## Five Observations
 
@@ -356,7 +355,7 @@ gp_covariance = function(x, xss, kernel, sigma_n) {
   # Copied from given scripts
   x = scale(x)
   xs = scale(xss)
-  n = length(x)
+  n = nrow(x)
   Kss = kernelMatrix(kernel = kernel, x = xs, y = xs)
   Kxx = kernelMatrix(kernel = kernel, x = x, y = x)
   Kxs = kernelMatrix(kernel = kernel, x = x, y = xs)
@@ -365,7 +364,6 @@ gp_covariance = function(x, xss, kernel, sigma_n) {
 }
 
 ```
-
 
 ```{r}
 
@@ -433,6 +431,8 @@ $$\mathtt{temp}=f(\mathtt{day}) + \epsilon \text{ with } \epsilon \sim \mathcal{
 
 Estimate the model using the squared exponential function with $\sigma_f=20$ and $\ell=0.2$. Superimpose the posterior mean from this model on the posterior mean from the model in (2). Note that this plot should also have the time variable on the horizontal axis. Compare the results of both models. What are the pros and cons of each model?
 
+**Answer:** TODO.
+
 ```{r}
 
 sigma_n = sd(lm(temp ~ day, data = temp_stockholm_reduced)$res)
@@ -455,7 +455,6 @@ Covf = gp_covariance(temp_stockholm_reduced$day,
                      sigma_n)
 
 ```
-
 
 ```{r, echo=FALSE}
 
@@ -491,6 +490,8 @@ $$k(x,x')=\sigma_f^2 \text{exp} \Bigg\{ \frac{2\text{sin}(\pi|x-x'|/d)}{\ell_1^2
 
 Note that we have two different length scales here, and $\ell_2$ controls the correlation between the same day in different years. Estimate the GP model using the time variable with this kernel and hyperparameters $\sigma_f=20$, $\ell_1=1$, $\ell_2=10$ and $d=365/\mathtt{sd}(\mathtt{time})$. The reason for the rather strange period here is that `kernlab` standardizes the inputs to have standard deviation of 1. Compare the fit to the previous two models (with $\sigma_f=20$ and $\ell=0.2$). Discuss the results.
 
+**Answer:** TODO.
+
 ```{r}
 
 #' periodic_kernel_factory
@@ -500,7 +501,7 @@ Note that we have two different length scales here, and $\ell_2$ controls the co
 #' @param ell_1 Ell_1.
 #' @param ell_2 Ell_2.
 #'
-#' @return Returns fresh functions directly from the canary island! Sweet!
+#' @return Returns fresh functions directly from the canary islands! Sweet!
 periodic_kernel_factory = function(sigma_f, d, ell_1, ell_2) {
   kf = function(x, y) {
     return(sigma_f^2 *
@@ -512,7 +513,6 @@ periodic_kernel_factory = function(sigma_f, d, ell_1, ell_2) {
 }
 
 ```
-
 
 ```{r}
 
@@ -570,40 +570,131 @@ ggplot(df) +
 
 ```
 
-
-
 # $\mathcal{GP}$ Classification with `kernlab`
 
 Download the banknote fraud data:
 
-```{r, eval=FALSE}
-data = read.csv("https://github.com/STIMALiU/AdvMLCourse/raw/master/\  
-                GaussianProcess/Code/banknoteFraud.csv", header=FALSE, sep=",")
+```{r}
+
+data = read.csv("https://github.com/STIMALiU/AdvMLCourse/raw/master/GaussianProcess/Code/banknoteFraud.csv", header=FALSE, sep=",")
 names(data) = c("varWave","skewWave","kurtWave","entropyWave","fraud")
 data[,5] = as.factor(data[,5])
+head(data)
+
 ```
 
-You can read about this dataset here. Choose $1000$ observations as training data using
-the following command (i.e., use the vector `SelectTraining` to subset the training observations):
+You can read about this dataset here. Choose $1000$ observations as training data using the following command (i.e., use the vector `SelectTraining` to subset the training observations):
 
-```{r, eval=FALSE}
+```{r}
 
 set.seed(111);
 SelectTraining = sample(1:dim(data)[1], size = 1000, replace = FALSE)
+
+data_train = data[SelectTraining,]
+data_test = data[-SelectTraining,]
 
 ```
 
 ## Using `kernlab` for Training a Model (Limited Covariates)
 
-**Task:** Use the R package `kernlab` to fit a Gaussian process classification model for fraud on the training data. Use the default kernel and hyperparameters. Start using only the covariates `varWave` and `skewWave` in the model. Plot contours of the prediction probabilities over a suitable grid of values for `varWave` and `skewWave`. Overlay the training data for fraud = 1 (as blue points) and fraud = 0 (as red points). You can reuse code from the file `KernLabDemo.R` available on the course website. Compute the confusion matrix for the classifier and its accuracy.
+**Task:** Use the R package `kernlab` to fit a Gaussian process classification model for `fraud` on the training data. Use the default kernel and hyperparameters. Start using only the covariates `varWave` and `skewWave` in the model. Plot contours of the prediction probabilities over a suitable grid of values for `varWave` and `skewWave`. Overlay the training data for `fraud = 1` (as blue points) and `fraud = 0` (as red points). You can reuse code from the file `KernLabDemo.R` available on the course website. Compute the confusion matrix for the classifier and its accuracy.
+
+```{r, warning=FALSE}
+
+# Hyper parameters
+sigma_n = sd(lm(fraud ~ varWave + skewWave, data = data_train)$res)
+
+# Fit
+gp_fit = gausspr(x = fraud ~ varWave + skewWave,
+                 data = data_train,
+                 var = sigma_n^2)
+
+# Confusion Matrix
+caret::confusionMatrix(gp_fit@fitted, data_train$fraud, mode="everything")
+
+```
+
+```{r, echo=FALSE}
+
+x1 = seq(min(data_train$varWave), max(data_train$varWave), length=100)
+x2 = seq(min(data_train$skewWave), max(data_train$skewWave), length=100)
+gridPoints = meshgrid(x1, x2)
+gridPoints = cbind(c(gridPoints$x), c(gridPoints$y))
+gridPoints = data.frame(gridPoints)
+names(gridPoints) = names(data_test)[1:2]
+probPreds = predict(gp_fit, gridPoints, type="probabilities")
+
+contour(x1, x2, matrix(probPreds[,1], 100, byrow = TRUE), 20,
+        xlab = names(data_test)[1],
+        ylab = names(data_test)[1],
+        main = 'varWave and skewWave')
+points(data_train[data_train$fraud == 0, 1],
+       data_train[data_train$fraud == 0, 2], col= "red")
+points(data_train[data_train$fraud == 1, 1],
+       data_train[data_train$fraud == 1, 2], col= "blue")
+
+```
+
 
 ## Predicting on the Test Set
 
 **Task:** Using the estimated model from (1), make predictions for the test set. Compute the accuracy.
 
+```{r}
+
+# Pref
+probs = predict(gp_fit, data_test)
+
+# Confusion Matrix
+caret::confusionMatrix(probs, data_test$fraud, mode="everything")
+
+```
+
+```{r, echo=FALSE}
+
+x1 = seq(min(data_test$varWave), max(data_test$varWave), length=100)
+x2 = seq(min(data_test$skewWave), max(data_test$skewWave), length=100)
+gridPoints = meshgrid(x1, x2)
+gridPoints = cbind(c(gridPoints$x), c(gridPoints$y))
+gridPoints = data.frame(gridPoints)
+names(gridPoints) = names(data_test)[1:2]
+probPreds = predict(gp_fit, gridPoints, type="probabilities")
+
+contour(x1, x2, matrix(probPreds[,1], 100, byrow = TRUE), 20,
+        xlab = names(data_test)[1],
+        ylab = names(data_test)[1],
+        main = 'varWave and skewWave')
+points(data_test[data_test$fraud == 0, 1],
+       data_test[data_test$fraud == 0, 2], col= "red")
+points(data_test[data_test$fraud == 1, 1],
+       data_test[data_test$fraud == 1, 2], col= "blue")
+
+```
+
 ## Using all Covariates
 
 **Task:** Train a model using all four covariates. Make predictions on the test set and compare the accuracy to the model with only two covariates.
+
+**Answer:** We see that both, the accuray and the f1 score are almost the same for the training and the test data for the first two exercises, that only rely on the features `varWave` and `skewWave`. The test score is *slightly* worse than the training score, which is to be expected. Using all features gives us a really good model with a high accuracy as well as a good f1 score.
+
+```{r, warning=FALSE}
+
+# Hyper parameterss
+sigma_n = sd(lm(fraud ~ varWave + skewWave + kurtWave + entropyWave,
+                data = data_train)$res)
+
+# Fit
+gp_fit = gausspr(x = fraud ~ varWave + skewWave + kurtWave + entropyWave,
+                 data = data_train,
+                 var = sigma_n^2)
+
+# Pref
+probs = predict(gp_fit, data_test)
+
+# Confusion Matrix
+caret::confusionMatrix(probs, data_test$fraud, mode="everything")
+
+```
 
 ```{r, ref.label=knitr::all_labels(), echo = TRUE, eval = FALSE, results = 'show'}
 
