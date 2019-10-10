@@ -368,7 +368,7 @@ gp_covariance = function(x, xss, kernel, sigma_n) {
 ```{r}
 
 # Parameters
-sigma_n = sd(lm(temp ~ time, data = temp_stockholm_reduced)$res)
+sigma_n = sd(lm(temp ~ time + I(time^2), data = temp_stockholm_reduced)$res)
 sigma_f = 20
 ell = 0.2
 
@@ -435,7 +435,7 @@ Estimate the model using the squared exponential function with $\sigma_f=20$ and
 
 ```{r}
 
-sigma_n = sd(lm(temp ~ day, data = temp_stockholm_reduced)$res)
+sigma_n = sd(lm(temp ~ day + I(day^2), data = temp_stockholm_reduced)$res)
 sigma_f = 20
 ell = 0.2
 
@@ -521,7 +521,7 @@ ell_1 = 1
 ell_2 = 10
 d = 365/sd(temp_stockholm_reduced$time)
 sigma_f = 20
-sigma_n = sd(lm(temp ~ day, data = temp_stockholm_reduced)$res)
+sigma_n = sd(lm(temp ~ day + I(day^2), data = temp_stockholm_reduced)$res)
 perker = periodic_kernel_factory(sigma_f, d, ell_1, ell_2)
 
 gp_fit = gausspr(x = temp ~ day,
