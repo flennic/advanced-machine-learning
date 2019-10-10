@@ -335,7 +335,7 @@ K
 ```
 
 
-## Estimate the above $\mathcal{GP}$ regression model
+## Estimate the Above $\mathcal{GP}$ Regression Model
 
 **Task:** Consider first the following model:
 
@@ -382,8 +382,8 @@ gp_fit = gausspr(x = temp ~ time,
 mean_pred = predict(gp_fit, temp_stockholm_reduced) 
 
 # Covariance
-Covf = gp_covariance(temp_stockholm_reduced$temp,
-                     temp_stockholm_reduced$temp,
+Covf = gp_covariance(temp_stockholm_reduced$time,
+                     temp_stockholm_reduced$time,
                      se_kernel,
                      sigma_n)
 
@@ -413,7 +413,6 @@ ggplot(df) +
   theme_minimal()
 
 ```
-
 
 ## Posterior Variance
 
@@ -486,7 +485,7 @@ ggplot(df) +
 
 **Task:** Finally, implement a generalization of the periodic kernel given in the lectures:
 
-$$k(x,x')=\sigma_f^2 \text{exp} \Bigg\{ \frac{2\text{sin}(\pi|x-x'|/d)}{\ell_1^2} \Bigg\} \text{exp} \Bigg\{-\frac{1}{2} \frac{|x-x'|^2}{\ell^2_2} \Bigg\}$$
+$$k(x,x')=\sigma_f^2 \text{exp} \Bigg\{ -\frac{2\text{sin}^2(\pi|x-x'|/d)}{\ell_1^2} \Bigg\} \text{exp} \Bigg\{-\frac{1}{2} \frac{|x-x'|^2}{\ell^2_2} \Bigg\}$$
 
 Note that we have two different length scales here, and $\ell_2$ controls the correlation between the same day in different years. Estimate the GP model using the time variable with this kernel and hyperparameters $\sigma_f=20$, $\ell_1=1$, $\ell_2=10$ and $d=365/\mathtt{sd}(\mathtt{time})$. The reason for the rather strange period here is that `kernlab` standardizes the inputs to have standard deviation of 1. Compare the fit to the previous two models (with $\sigma_f=20$ and $\ell=0.2$). Discuss the results.
 
@@ -505,7 +504,7 @@ Note that we have two different length scales here, and $\ell_2$ controls the co
 periodic_kernel_factory = function(sigma_f, d, ell_1, ell_2) {
   kf = function(x, y) {
     return(sigma_f^2 *
-             exp(2 * sin(pi * abs(x - y)/d)/ell_1^2) *
+             exp(-2 * sin(pi * abs(x - y)/d)^2/ell_1^2) *
              exp(-0.5 * (abs(x - y)^2)/ell_2^2))
   }
   class(kf) = "kernel"
@@ -521,10 +520,10 @@ ell_1 = 1
 ell_2 = 10
 d = 365/sd(temp_stockholm_reduced$time)
 sigma_f = 20
-sigma_n = sd(lm(temp ~ day + I(day^2), data = temp_stockholm_reduced)$res)
+sigma_n = sd(lm(temp ~ time + I(time^2), data = temp_stockholm_reduced)$res)
 perker = periodic_kernel_factory(sigma_f, d, ell_1, ell_2)
 
-gp_fit = gausspr(x = temp ~ day,
+gp_fit = gausspr(x = temp ~ time,
                  data = temp_stockholm_reduced,
                  kernel = periodic_kernel_factory,
                  kpar = list(sigma_f = sigma_f,
@@ -537,8 +536,8 @@ gp_fit = gausspr(x = temp ~ day,
 mean_pred = predict(gp_fit, temp_stockholm_reduced) 
 
 # Covariance
-Covf = gp_covariance(temp_stockholm_reduced$day,
-                     temp_stockholm_reduced$day,
+Covf = gp_covariance(temp_stockholm_reduced$time,
+                     temp_stockholm_reduced$time,
                      perker,
                      sigma_n)
 
