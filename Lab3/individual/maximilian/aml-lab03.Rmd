@@ -90,6 +90,7 @@ particle_filter = function(observations, T=100, M=100, sd_emission=1, corr=TRUE)
   X_bar = matrix(nrow = T, ncol = M) # Prior believe
   W = matrix(nrow = T, ncol = M)
   Z = vector(length = T)
+  S = vector(length = T)
   
   for (t in 1:T) {
     
@@ -119,13 +120,14 @@ particle_filter = function(observations, T=100, M=100, sd_emission=1, corr=TRUE)
     # Taken from Bishop
     #Z[t] = as.numeric(W[t, ] %*% X[t, ])
     Z[t] = mean(X[t,])
+    S[t] = sd(X[t,])
     
     if (t %in% particle_plot_locations) {
       particle_df[, match(t, particle_plot_locations)] = X[t,]
     }
   }
   
-  return(list(X=X, X_bar=X_bar, W=W, Z=Z, particles=particle_df))
+  return(list(X=X, X_bar=X_bar, W=W, Z=Z, S=S, particles=particle_df))
 }
 
 
@@ -149,12 +151,21 @@ res = particle_filter(observations$obs,
 df = data.frame(time = 1:iterations,
                 true_states=observations$states,
                 observed_states=observations$obs,
-                estimated_states=res$Z)
+                estimated_states=res$Z,
+                deviation=res$S)
 
 ggplot(df) +
   geom_line(aes(x = time, y = true_states, colour = "True States")) +
   geom_line(aes(x = time, y = observed_states, colour = "Observed States")) +
   geom_line(aes(x = time, y = estimated_states, colour = "Estimated States")) +
+  geom_ribbon(aes(x = time,
+                  ymin = estimated_states - 1.96 * deviation,
+                  ymax = estimated_states + 1.96 * deviation), 
+                alpha=0.05,
+                linetype=3,
+                colour="grey70",
+                size=1,
+                fill="black") +
   labs(title = "True, Observed and Estimated States (sd=1)",
        y = "Position",
        x = "Time", color = "Legend") +
@@ -168,8 +179,6 @@ plot(density(res$particles[,3]), main="Histogram of the first particles at 2/3")
 plot(density(res$particles[,3]), main="Histogram of the last particles")
 
 ```
-
-
 
 
 # Different Standard Deviations
@@ -196,12 +205,21 @@ res = particle_filter(observations$obs,
 df = data.frame(time = 1:iterations,
                 true_states=observations$states,
                 observed_states=observations$obs,
-                estimated_states=res$Z)
+                estimated_states=res$Z,
+                deviation=res$S)
 
 ggplot(df) +
   geom_line(aes(x = time, y = true_states, colour = "True States")) +
   geom_line(aes(x = time, y = observed_states, colour = "Observed States")) +
   geom_line(aes(x = time, y = estimated_states, colour = "Estimated States")) +
+  geom_ribbon(aes(x = time,
+                  ymin = estimated_states - 1.96 * deviation,
+                  ymax = estimated_states + 1.96 * deviation), 
+                alpha=0.05,
+                linetype=3,
+                colour="grey70",
+                size=1,
+                fill="black") +
   labs(title = "True, Observed and Estimated States (sd=5)",
        y = "Position",
        x = "Time", color = "Legend") +
@@ -234,12 +252,21 @@ res = particle_filter(observations$obs,
 df = data.frame(time = 1:iterations,
                 true_states=observations$states,
                 observed_states=observations$obs,
-                estimated_states=res$Z)
+                estimated_states=res$Z,
+                deviation=res$S)
 
 ggplot(df) +
   geom_line(aes(x = time, y = true_states, colour = "True States")) +
   geom_line(aes(x = time, y = observed_states, colour = "Observed States")) +
   geom_line(aes(x = time, y = estimated_states, colour = "Estimated States")) +
+  geom_ribbon(aes(x = time,
+                  ymin = estimated_states - 1.96 * deviation,
+                  ymax = estimated_states + 1.96 * deviation), 
+                alpha=0.05,
+                linetype=3,
+                colour="grey70",
+                size=1,
+                fill="black") +
   labs(title = "True, Observed and Estimated States (sd=50)",
        y = "Position",
        x = "Time", color = "Legend") +
