@@ -384,7 +384,7 @@ SquaredExpKernel = function(sigmaF, l){
     return(K)
   }
   
-  class(kernel) = "kernel" # needed for 
+  class(kernel) = "kernel"
   return(kernel)
 }
 
@@ -443,7 +443,7 @@ Playing around with the parameters `sigmaF` and `l` led to the following insight
 
 ```{r echo=TRUE}
 
-# Update SE_Kernel mit given parameters (for later)
+# Update SE_Kernel with given parameters (for later)
 SE_kernel = SquaredExpKernel(sigmaF = 20, l = 0.2)
 
 # Find sigmaNoise 
@@ -527,50 +527,75 @@ prediction because there is e.g. no strong trend across the years.
 
 ```{r echo = TRUE}
 
-# Find sigmaNoise 
+# Set parameters ---------------------------------------------------------------
+
+# SigmaNoise 
 res = lm(temp ~ day + I(day^2), df)
 sigmaNoise = sd(res$residuals)
 
-# Fit the GP with built in Square expontial kernel (called rbfdot in kernlab)
-res = gausspr(temp ~ day, data = df, kernel = SquaredExpKernel, 
-                 kpar = list(sigmaF = 20, l = 0.2), var = sigmaNoise^2)
+# Hyperparameters
+sigmaF = 20
+l = 0.2
 
-plot(df$time, df$temp, ylim = c(-40, 40), 
+# Kernel 
+my_kernel = SquaredExpKernel
+
+# Formula
+my_formula = as.formula("temp ~ day")
+
+# Names
+x_axis_name = "time"
+y_name = "temp"
+x_name = "day"
+
+# Fit Model --------------------------------------------------------------------
+
+# Update kernel with given parameters
+my_kernel_params = my_kernel(sigmaF = sigmaF, l = l)
+
+x_axis = df[[x_axis_name]]
+x_vals = df[[x_name]]
+y_vals = df[[y_name]]
+
+# Fit the GP with built in Square expontial kernel (called rbfdot in kernlab)
+res = gausspr(my_formula, data = df, kernel = my_kernel, 
+              kpar = list(sigmaF = sigmaF, l = l), var = sigmaNoise^2)
+  
+plot(x_axis, y_vals, ylim = c(-40, 40), 
      main = "Data with GP Posterior Mean (orange)
 95% CI for Mean (blue) and for Data Points (lightblue)")
 meanPred = predict(res, df) # Predicting the training data. To plot the fit.
-lines(df$time, meanPred, col="orange", lwd = 3)
+lines(x_axis, meanPred, col="orange", lwd = 3)
 
 # Probability and prediction interval implementation.
 # Note: Scaling required since mean was automatically scaled by kernlab as well.
-x = scale(df$day) # 
-xs = scale(df$day) # XStar
+x = scale(x_vals) # 
+xs = scale(x_vals) # XStar
 n = length(x)
-Kss = kernelMatrix(kernel = SE_kernel, x = xs, y = xs)
-Kxx = kernelMatrix(kernel = SE_kernel, x = x, y = x)
-Kxs = kernelMatrix(kernel = SE_kernel, x = x, y = xs)
+Kss = kernelMatrix(kernel = my_kernel_params, x = xs, y = xs)
+Kxx = kernelMatrix(kernel = my_kernel_params, x = x, y = x)
+Kxs = kernelMatrix(kernel = my_kernel_params, x = x, y = xs)
 Covf = Kss-t(Kxs)%*%solve(Kxx + sigmaNoise^2*diag(n), Kxs) # Covariance matrix of fStar
 
 # Probability and prediction interval implementation.
 # Note: Scaling required since mean was automatically scaled by kernlab as well.
-x = scale(df$day) # 
-xs = scale(df$day) # XStar
+x = scale(x_vals) # 
+xs = scale(x_vals) # XStar
 n = length(x)
-Kss = kernelMatrix(kernel = SE_kernel, x = xs, y = xs)
-Kxx = kernelMatrix(kernel = SE_kernel, x = x, y = x)
-Kxs = kernelMatrix(kernel = SE_kernel, x = x, y = xs)
-Covf = Kss-t(Kxs)%*%solve(Kxx + sigmaNoise^2*diag(n), Kxs) # Covariance matrix of fStar
+Kss = kernelMatrix(kernel = my_kernel_params, x = xs, y = xs)
+Kxx = kernelMatrix(kernel = my_kernel_params, x = x, y = x)
+Kxs = kernelMatrix(kernel = my_kernel_params, x = x, y = xs)
+Covf = Kss-t(Kxs)%*%solve(Kxx + sigmaNoise^2*diag(n), Kxs) # Cov. matrix of fStar
 
 # Probability intervals for fStar
-lines(df$time, meanPred - 1.96*sqrt(diag(Covf)), col = "steelblue4", lwd = 2)
-lines(df$time, meanPred + 1.96*sqrt(diag(Covf)), col = "steelblue4", lwd = 2)
+lines(x_axis, meanPred - 1.96*sqrt(diag(Covf)), col = "steelblue4", lwd = 2)
+lines(x_axis, meanPred + 1.96*sqrt(diag(Covf)), col = "steelblue4", lwd = 2)
 
 # Prediction intervals for yStar
-lines(df$time, meanPred - 1.96*sqrt((diag(Covf) + sigmaNoise^2)), col = "steelblue2")
-lines(df$time, meanPred + 1.96*sqrt((diag(Covf) + sigmaNoise^2)), col = "steelblue2") 
+lines(x_axis, meanPred - 1.96*sqrt((diag(Covf) + sigmaNoise^2)), col = "steelblue2")
+lines(x_axis, meanPred + 1.96*sqrt((diag(Covf) + sigmaNoise^2)), col = "steelblue2") 
 
 ```
-
 
 ## 5: Periodic Kernel
 
@@ -621,54 +646,80 @@ PeriodicKernel = function(sigmaF, l1, l2, d){
 ```
 
 
-```{r}
+```{r echo = TRUE}
 
-# Find sigmaNoise 
+# Set parameters ---------------------------------------------------------------
+
+# SigmaNoise 
 res = lm(temp ~ time + I(time^2), df)
 sigmaNoise = sd(res$residuals)
 
-# Fit the GP with built in Square expontial kernel (called rbfdot in kernlab)
-res = gausspr(temp ~ time, data = df, kernel = PeriodicKernel, 
-              kpar = list(sigmaF = 20, l1 = 1, l2 = 10, d = 365/sd(df$time)), 
-              var = sigmaNoise^2)
+# Hyperparameters
+sigmaF = 20
+l1 = 1
+l2 = 10
+d = 365/sd(df$time)
 
-plot(df$time, df$temp, ylim = c(-40, 40), 
+# Kernel 
+my_kernel = PeriodicKernel
+
+# Formula
+my_formula = as.formula("temp ~ time")
+
+# Names
+x_axis_name = "time"
+y_name = "temp"
+x_name = "time"
+
+# Fit Model --------------------------------------------------------------------
+
+# Update kernel with given parameters
+my_kernel_params = my_kernel(sigmaF = sigmaF, l1 = l1, l2 = l2, d = d)
+
+x_axis = df[[x_axis_name]]
+x_vals = df[[x_name]]
+y_vals = df[[y_name]]
+
+# Fit the GP with built in Square expontial kernel (called rbfdot in kernlab)
+res = gausspr(my_formula, data = df, kernel = my_kernel, 
+              kpar = list(sigmaF = sigmaF, l1 = l1, l2 = l2, d = d), 
+              var = sigmaNoise^2)
+  
+plot(x_axis, y_vals, ylim = c(-40, 40), 
      main = "Data with GP Posterior Mean (orange)
 95% CI for Mean (blue) and for Data Points (lightblue)")
 meanPred = predict(res, df) # Predicting the training data. To plot the fit.
-lines(df$time, meanPred, col="orange", lwd = 3)
+lines(x_axis, meanPred, col="orange", lwd = 3)
 
 # Probability and prediction interval implementation.
 # Note: Scaling required since mean was automatically scaled by kernlab as well.
-x = scale(df$time) # 
-xs = scale(df$time) # XStar
+x = scale(x_vals) # 
+xs = scale(x_vals) # XStar
 n = length(x)
-Kss = kernelMatrix(kernel = SE_kernel, x = xs, y = xs)
-Kxx = kernelMatrix(kernel = SE_kernel, x = x, y = x)
-Kxs = kernelMatrix(kernel = SE_kernel, x = x, y = xs)
+Kss = kernelMatrix(kernel = my_kernel_params, x = xs, y = xs)
+Kxx = kernelMatrix(kernel = my_kernel_params, x = x, y = x)
+Kxs = kernelMatrix(kernel = my_kernel_params, x = x, y = xs)
 Covf = Kss-t(Kxs)%*%solve(Kxx + sigmaNoise^2*diag(n), Kxs) # Covariance matrix of fStar
 
 # Probability and prediction interval implementation.
 # Note: Scaling required since mean was automatically scaled by kernlab as well.
-x = scale(df$time) # 
-xs = scale(df$time) # XStar
+x = scale(x_vals) # 
+xs = scale(x_vals) # XStar
 n = length(x)
-Kss = kernelMatrix(kernel = SE_kernel, x = xs, y = xs)
-Kxx = kernelMatrix(kernel = SE_kernel, x = x, y = x)
-Kxs = kernelMatrix(kernel = SE_kernel, x = x, y = xs)
-Covf = Kss-t(Kxs)%*%solve(Kxx + sigmaNoise^2*diag(n), Kxs) # Covariance matrix of fStar
+Kss = kernelMatrix(kernel = my_kernel_params, x = xs, y = xs)
+Kxx = kernelMatrix(kernel = my_kernel_params, x = x, y = x)
+Kxs = kernelMatrix(kernel = my_kernel_params, x = x, y = xs)
+Covf = Kss-t(Kxs)%*%solve(Kxx + sigmaNoise^2*diag(n), Kxs) # Cov. matrix of fStar
 
 # Probability intervals for fStar
-lines(df$time, meanPred - 1.96*sqrt(diag(Covf)), col = "steelblue4", lwd = 2)
-lines(df$time, meanPred + 1.96*sqrt(diag(Covf)), col = "steelblue4", lwd = 2)
+lines(x_axis, meanPred - 1.96*sqrt(diag(Covf)), col = "steelblue4", lwd = 2)
+lines(x_axis, meanPred + 1.96*sqrt(diag(Covf)), col = "steelblue4", lwd = 2)
 
 # Prediction intervals for yStar
-lines(df$time, meanPred - 1.96*sqrt((diag(Covf) + sigmaNoise^2)), col = "steelblue2")
-lines(df$time, meanPred + 1.96*sqrt((diag(Covf) + sigmaNoise^2)), col = "steelblue2") 
-
+lines(x_axis, meanPred - 1.96*sqrt((diag(Covf) + sigmaNoise^2)), col = "steelblue2")
+lines(x_axis, meanPred + 1.96*sqrt((diag(Covf) + sigmaNoise^2)), col = "steelblue2") 
 
 ```
-
 
 # Assignment 3: GP Classification with kernlab
 
