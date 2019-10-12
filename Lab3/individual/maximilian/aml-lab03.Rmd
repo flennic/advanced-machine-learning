@@ -52,12 +52,12 @@ rtransition = function(z_t_1, sd=1) {
   return(rnorm(1, sample(c(0,1,2), size=1)+z_t_1, sd=sd))
 }
 
-remission = function(n, z_t, sd=1) {
-  return(rnorm(1, sample(c(0,1,2), size=1)+z_t, sd=sd))
+remission = function(z_t, sd=1) {
+  return(rnorm(1, sample(c(-1, 0, 1), size=1)+z_t, sd=sd))
 }
 
 demission = function(x_t, z_t, sd=1) {
-  return(sum(dnorm(x_t, c(0, -1, 1)+z_t, sd=sd))/3)
+  return(sum(dnorm(x_t, c(-1, 0, 1)+z_t, sd=sd))/3)
 }
 
 rinit = function(n) {
@@ -70,11 +70,11 @@ sample_observations = function(n, sd_emission=1) {
   observations = vector(length = n) # X
   
   states[1] = rinit(1)
-  observations[1] = remission(1, states[1], sd_emission)
+  observations[1] = remission(states[1], sd_emission)
   
   for (i in 2:n) {
     states[i] = rtransition(states[i-1])
-    observations[i] = remission(1, states[i], sd_emission)
+    observations[i] = remission(states[i], sd_emission)
   }
   
   return(data.frame(states = states, obs = observations))
