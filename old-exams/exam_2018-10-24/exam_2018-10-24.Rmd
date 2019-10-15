@@ -211,6 +211,21 @@ custom_forward = function(hmm, observations) {
   return(t(Z))
 }
 
+custom_backward = function(hmm, observations) {
+  
+  Z = matrix(NA, ncol=length(hmm$States), nrow=length(observations))
+  
+  Z[length(observations),] = 1
+  
+  for (t in ((length(observations)-1):0)) {
+    for (state in 1:length(hmm$States)) {
+     Z[t, state] = sum(Z[t+1,] * hmm$emissionProbs[,observations[t+1]] * transProbs[state,]) 
+    }
+  }
+  
+  return(t(Z))
+}
+
 ```
 
 ```{r}
@@ -220,6 +235,13 @@ alpha_custom = custom_forward(robot_hmm, simulatedStates$observation)
 
 alpha[,1:10]
 alpha_custom[,1:10]
+
+beta = exp(backward(robot_hmm, simulatedStates$observation))
+beta_custom = custom_backward(robot_hmm, simulatedStates$observation)
+
+beta[,1:10]
+beta_custom[,1:10]
+
 ```
 
 

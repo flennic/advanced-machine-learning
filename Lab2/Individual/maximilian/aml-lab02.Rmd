@@ -88,6 +88,41 @@ simulatedStates = simHMM(robot_hmm, nSim)
 
 ```{r}
 
+# Custom implementations of the forward and backward algorithm
+
+custom_forward = function(hmm, observations) {
+  
+  Z = matrix(NA, ncol=length(hmm$States), nrow=length(observations))
+  
+  Z[1,] = hmm$emissionProbs[, observations[1]] * hmm$startProbs
+  
+  for (t in 2:length(observations)) {
+    Z[t, ] = hmm$emissionProbs[, observations[t]] * (Z[t-1,] %*% hmm$transProbs)
+  }
+  
+  return(t(Z))
+}
+
+custom_backward = function(hmm, observations) {
+  
+  Z = matrix(NA, ncol=length(hmm$States), nrow=length(observations))
+  
+  Z[length(observations),] = 1
+  
+  for (t in ((length(observations)-1):0)) {
+    for (state in 1:length(hmm$States)) {
+     Z[t, state] = sum(Z[t+1,] * hmm$emissionProbs[,observations[t+1]] * transProbs[state,]) 
+    }
+  }
+  
+  return(t(Z))
+}
+
+```
+
+
+```{r}
+
 # The library returns the probabilities logged, we we have to de-log
 alpha = exp(forward(robot_hmm, simulatedStates$observation))
 beta = exp(backward(robot_hmm, simulatedStates$observation))
