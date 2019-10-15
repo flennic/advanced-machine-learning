@@ -1,6 +1,6 @@
 ---
 title: "Advanced Machine Learning - Lab 04"
-author: "G. Hari Prasath (hargo729), Julius Kittler (julki029), Hector Plata (hecpl268) and Maximilian Pfundstein (maxpf364)"
+author: "Maximilian Pfundstein (maxpf364)"
 date: "`r Sys.Date()`"
 output:
   pdf_document:
@@ -351,11 +351,11 @@ Let $\sigma_n^2$ be the residual variance from a simple quadratic regression fit
 #' @param xss X_star, which will be scaled.
 #'
 #' @return The covariance matrix.
-gp_covariance = function(x, xss, kernel, sigma_n) {
+gp_covariance = function(x, xs, kernel, sigma_n) {
   # Copied from given scripts
-  x = scale(x)
-  xs = scale(xss)
-  n = nrow(x)
+  #x = scale(x)
+  #xs = scale(xs)
+  n = length(x)
   Kss = kernelMatrix(kernel = kernel, x = xs, y = xs)
   Kxx = kernelMatrix(kernel = kernel, x = x, y = x)
   Kxs = kernelMatrix(kernel = kernel, x = x, y = xs)
@@ -371,6 +371,8 @@ gp_covariance = function(x, xss, kernel, sigma_n) {
 sigma_n = sd(lm(temp ~ time + I(time^2), data = temp_stockholm_reduced)$res)
 sigma_f = 20
 ell = 0.2
+
+se_kernel = se_kernel_factory(sigma_f, ell)
 
 gp_fit = gausspr(x = temp ~ time,
                  data = temp_stockholm_reduced,
@@ -430,7 +432,7 @@ $$\mathtt{temp}=f(\mathtt{day}) + \epsilon \text{ with } \epsilon \sim \mathcal{
 
 Estimate the model using the squared exponential function with $\sigma_f=20$ and $\ell=0.2$. Superimpose the posterior mean from this model on the posterior mean from the model in (2). Note that this plot should also have the time variable on the horizontal axis. Compare the results of both models. What are the pros and cons of each model?
 
-**Answer:** TODO.
+**Answer:** When we are using the `time`, then we capture the whole trend, while using the `day` we capture the trends within the year. This can be seen as the variance stays the same over the years for the `day` and changed over time for the `time` data. Also for the day the plot becomes more bumpy, as less data is used for the smoothing. `day` cannot capture trends over the years like global warming, whereas `time` does that.
 
 ```{r}
 
@@ -489,7 +491,7 @@ $$k(x,x')=\sigma_f^2 \text{exp} \Bigg\{ -\frac{2\text{sin}^2(\pi|x-x'|/d)}{\ell_
 
 Note that we have two different length scales here, and $\ell_2$ controls the correlation between the same day in different years. Estimate the GP model using the time variable with this kernel and hyperparameters $\sigma_f=20$, $\ell_1=1$, $\ell_2=10$ and $d=365/\mathtt{sd}(\mathtt{time})$. The reason for the rather strange period here is that `kernlab` standardizes the inputs to have standard deviation of 1. Compare the fit to the previous two models (with $\sigma_f=20$ and $\ell=0.2$). Discuss the results.
 
-**Answer:** TODO.
+**Answer:** This last implementation aquires the skill to better capture long term trends, like global warming. This can be seen in the plot, as the varaince becomes lass over time while the smoothing itself did not become bumpy. It seems like this this last model is the most useful model.
 
 ```{r}
 
@@ -586,7 +588,7 @@ You can read about this dataset here. Choose $1000$ observations as training dat
 
 ```{r}
 
-set.seed(111);
+set.seed(111)
 SelectTraining = sample(1:dim(data)[1], size = 1000, replace = FALSE)
 
 data_train = data[SelectTraining,]
@@ -601,12 +603,14 @@ data_test = data[-SelectTraining,]
 ```{r, warning=FALSE}
 
 # Hyper parameters
-sigma_n = sd(lm(fraud ~ varWave + skewWave, data = data_train)$res)
+#sigma_n = sd(lm(fraud ~ varWave + skewWave, data = data_train)$res)
 
 # Fit
+#gp_fit = gausspr(x = fraud ~ varWave + skewWave,
+#                 data = data_train,
+#                 var = sigma_n^2)
 gp_fit = gausspr(x = fraud ~ varWave + skewWave,
-                 data = data_train,
-                 var = sigma_n^2)
+                 data = data_train)
 
 # Confusion Matrix
 caret::confusionMatrix(gp_fit@fitted, data_train$fraud, mode="everything")
@@ -633,7 +637,6 @@ points(data_train[data_train$fraud == 1, 1],
        data_train[data_train$fraud == 1, 2], col= "blue")
 
 ```
-
 
 ## Predicting on the Test Set
 

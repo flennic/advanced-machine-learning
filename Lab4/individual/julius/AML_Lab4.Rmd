@@ -365,21 +365,38 @@ Instead of using `rfbdot` (as `kernel` parameter for `gausspr`), we are supposed
 
 $$k(\textbf{x}, \textbf{x}') = \operatorname{cov}(f(\textbf{x}), f(\textbf{x}')) = \sigma_f^2 \operatorname{exp}\left(-\frac{||\textbf{x} - \textbf{x}'||^2}{2l^2}\right)$$
 
-Note that this function returns a matrix of dimensions: `length(x) x length(y)`, 
-where x and y can have different lengths. Every row represents an entry of x
-and every column represents an entry for y. Also note that we define a function
-that returns a function (i.e. a closure) since this is required so that we can
-use the kernel with `gausspr`.
+Note that the kernel function itself does not return a matrix. Instead, it returns
+1 scalar given 2 scalars or vectors. This returned scalar is later on used as 
+variance or covariance in the covariance matrix.
 
 ```{r echo=TRUE}
 
 # Define closure (needed for gausspr)
 SquaredExpKernel = function(sigmaF, l){
   kernel  = function(x, y){
+    r = sqrt(t(x-y) %*% (x-y)) # euclidean distance
+    K = sigmaF^2 * exp(-0.5 * r^2 / l^2)
+    return(K)
+  }
+  class(kernel) = "kernel"
+  return(kernel)
+}
+
+```
+
+```{r eval = FALSE, echo=FALSE}
+
+### Note: We may also define a function that directly gives us a Kernel matrix
+# However this works well only if we have a 1 dimensional x-space. If so, then
+# kernelMatrix(kernel = SE_kernel, x, y) == SE_kernel(x, y)
+
+SquaredExpKernelMatrix = function(sigmaF, l){
+  kernel  = function(x, y){
     
     K = matrix(NA, length(x), length(y))
     for (i in 1:length(x)){
-      K[i, ] = sigmaF^2 * exp(-0.5*(x[i] - y)^2 / l^2)
+      r = x[i] - y
+      K[i, ] = sigmaF^2 * exp(-0.5 * r^2 / l^2)
     }
     return(K)
   }
@@ -389,6 +406,7 @@ SquaredExpKernel = function(sigmaF, l){
 }
 
 ```
+
 
 Here, we conduct a quick comparison of the results we get when applying the
 own implementation of the squared exponential kernel with R's equivalent 
@@ -406,7 +424,6 @@ SE_kernel_rbfdot = rbfdot(sigma = 1/(2*l^2))
 SE_kernel = SquaredExpKernel(sigmaF = 1, l = 1)
 
 # Example
-# SquaredExpKernel(x1 = c(2, 4), x2 = 1) # 2x1
 SE_kernel(x = 1, y = 2) 
 SE_kernel_rbfdot(1, 2)
 
@@ -532,7 +549,7 @@ prediction because there is e.g. no strong trend across the years.
 # SigmaNoise 
 res = lm(temp ~ day + I(day^2), df)
 sigmaNoise = sd(res$residuals)
-
+sigmaNoise = 50
 # Hyperparameters
 sigmaF = 20
 l = 0.2
@@ -620,11 +637,29 @@ Considering the 2 used kernels (only with `time`), we could say that the...
 - is better if we prefer more control over certain parameters e.g. `d` and `l2`
 - is appropriate if there is periodicity
 
-
-```{r echo = TRUE}
+```{r echo=TRUE}
 
 # Define closure (needed for gausspr)
 PeriodicKernel = function(sigmaF, l1, l2, d){
+  kernel  = function(x, y){
+    r = sqrt(t(x-y) %*% (x-y)) # euclidean distance
+    K = sigmaF^2 * exp(-2 * sin(pi*r/d)^2 / l1^2) *
+                   exp(-0.5 * r^2 / l2^2) 
+    return(K)
+  }
+  class(kernel) = "kernel"
+  return(kernel)
+}
+
+```
+
+
+```{r echo = FALSE, eval = FALSE}
+
+### Note: We may also define a function that directly gives us a Kernel matrix
+# However this works well only if we have a 1 dimensional x-space. If so, then
+# kernelMatrix(kernel = my_kernel_params, x, y) == my_kernel_params(x, y)
+PeriodicKernelMatrix = function(sigmaF, l1, l2, d){
   
   kernel  = function(x, y){
     
