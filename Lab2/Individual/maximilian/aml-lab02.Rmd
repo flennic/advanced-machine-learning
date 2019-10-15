@@ -1,6 +1,6 @@
 ---
 title: "Advanced Machine Learning - Lab 02"
-author: "G. Hari Prasath (hargo729), Julius Kittler (julki029), Hector Plata (hecpl268) and Maximilian Pfundstein (maxpf364)"
+author: "Maximilian Pfundstein (maxpf364)"
 date: "`r Sys.Date()`"
 output:
   pdf_document:
@@ -46,14 +46,14 @@ startProbs = rep(1/N, N)
 
 # Transition Probabilities
 transProbs = matrix(0, ncol = N, nrow = N)
-# Staying in the current state with 0.5 probability is just die diagonal
+# Staying in the current state with 0.5 probability is just the diagonal
 diag(transProbs) = 0.5
 # Moving to the next is also 0.5
 diag(transProbs[,-1]) = 0.5
 transProbs[10, 1] = 0.5
 
 # Emission Probabilities
-emissionProbs = matrix(0, ncol = N, nrow = 10)
+emissionProbs = matrix(0, ncol = N, nrow = N)
 
 # 0.2 For i-2 to i+2
 for (i in 1:N) {
@@ -88,7 +88,7 @@ simulatedStates = simHMM(robot_hmm, nSim)
 
 ```{r}
 
-# The library retruns the probabilities logged, we we have to de-log
+# The library returns the probabilities logged, we we have to de-log
 alpha = exp(forward(robot_hmm, simulatedStates$observation))
 beta = exp(backward(robot_hmm, simulatedStates$observation))
 

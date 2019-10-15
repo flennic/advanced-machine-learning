@@ -1,6 +1,6 @@
 ---
 title: "Advanced Machine Learning (732A96) - Lab 04"
-author: "Hector Plata (hecpl268)"
+author: Hariprasath Govindarajan (hargo729), Julius Kittler (julki092), Hector Plata (hecpl268) and Maximilian Pfundstein (maxpf364)
 output:
   pdf_document:
     toc: true

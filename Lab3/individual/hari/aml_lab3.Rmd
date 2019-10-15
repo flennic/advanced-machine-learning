@@ -201,12 +201,15 @@ particle_filter = function(num_particles, observations, initial_model,
   # Generate initial particles from initial model
   particles = sapply(1:num_particles, function(i) initial_model())
   
+  # Mean estimates of particles at each time step
+  mean_estimates = vector(mode = "numeric", length = N)
+  
   # Weights
   w_t = rep(1, num_particles)
   
   for(t in 1:N){
-    # Method 1
     if(method == 1){
+      # Method 1
       # Vector for belief set of particles
       bel_particles = vector(mode = "numeric", length = num_particles)
       
@@ -228,9 +231,12 @@ particle_filter = function(num_particles, observations, initial_model,
       # using weighted probabilities with replacement
       particles = sample(bel_particles, size = num_particles, 
                          prob = w_t, replace = TRUE)
+      
+      # Calculate mean estimates of particles for each time step
+      mean_estimates[t] = mean(particles)
     }
-    # Method 2
     else{
+      # Method 2
       # Sample particles from the mixture model of weighted transition models
       # z_t given x_(1:t-1)
       
@@ -251,14 +257,17 @@ particle_filter = function(num_particles, observations, initial_model,
       
       # Normalize weights
       w_t = w_t/sum(w_t)
+      
+      # Calculate mean estimate of particles as a weighted sum
+      # Note: Weights used for sampling were based on x_(1:t-1)
+      # The weights updated in this iteration update the mean 
+      # estimate based on observation, x_t
+      mean_estimates[t] = sum(particles*w_t)
     }
     
     # Add the set of particles to particle history
     particle_history[t, ] = particles
   }
-  
-  # Calculate mean estimates of particles for each time step
-  mean_estimates = rowMeans(particle_history)
   
   res = list(pf_history = particle_history, 
              pf_means = mean_estimates)
@@ -271,10 +280,18 @@ particle_filter = function(num_particles, observations, initial_model,
 Now, we perform particle filtering using 100 particles based on the observations that we simulated earlier. We also calculate the residuals as the difference between the mean estimates obtained from the particles at each time step and the true states from the simulation.
 
 ```{r, echo=T}
-# Running particle filter
+# Running particle filter (method 1)
 pf_res = particle_filter(100, ssm_obs, initial_model, transition_model, 
                          emission_model, emission_prob, method = 2)
 residuals = pf_res$pf_means - ssm_states
+
+```
+
+```{r, echo=T}
+# Running particle filter (method 2)
+pf_res_2 = particle_filter(100, ssm_obs, initial_model, transition_model, 
+                         emission_model, emission_prob, method = 1)
+residuals_2 = pf_res_2$pf_means - ssm_states
 
 ```
 
@@ -302,12 +319,18 @@ ggplot() + geom_line(aes(x = 1:100, y = residuals)) +
 ```
 
 ```{r}
-hist_plt(residuals[2:length(residuals)]) +
-  ggtitle("Residuals for Particle Filter Mean Estimate") +
+hist_plt(residuals) +
+  ggtitle("Residuals for Particle Filter Mean Estimate (Method 2)") +
   labs(x = "Residuals")
 ```
 
-From the above plots, we see that the mean estimates of the particle filter are quite accurate when compared to the true states. From the residuals plot, we can see that the residuals are somewhat normally distributed and that most of the residuals are falling in the range of $[-3, 3]$. 
+```{r}
+hist_plt(residuals_2) +
+  ggtitle("Residuals for Particle Filter Mean Estimate (Method 1)") +
+  labs(x = "Residuals")
+```
+
+From the above plots, we see that the mean estimates of the particle filter are quite accurate when compared to the true states. From the residuals plot, we can see that the residuals are somewhat normally distributed and that most of the residuals are falling in the range of $[-3, 2]$ using both the methods. 
 
 ### Particle values at different time steps
 
@@ -332,7 +355,7 @@ plot_particle_dist = function(t, pf_history, pf_means, true_states,
 
 ```
 
-To visualize the particle values at certain time steps, we plot their histogram and density distributions along with their mean and the true state. We show these plots for the first 2 time steps, last 2 time steps and the intermediate time steps - 30 and 70.
+To visualize the particle values at certain time steps, we plot their histogram and density distributions along with their mean and the true state. We show these plots for the first 2 time steps, last 2 time steps and the intermediate time steps - 30 and 70. Note that in method-2, we are plotting the particle distribution but the mean estimate is not the mean of the particles but it is the weighted sum of the particle values.
 
 ```{r}
 p1 = plot_particle_dist(1, pf_res$pf_history, pf_res$pf_means, 
@@ -357,7 +380,7 @@ grid.arrange(p5, p6, nrow = 1)
 
 ```
 
-At $T=0$, we sample the particles from the initial model which is $Unif(0, 100)$ with a mean estimate close to 50. But, after resampling at $T=1$, we see that the values closer to the observation get higher weights and hence, are sampled more often. So, the mean estimate has moved from 50 towards the observation value. At higher time steps, we see that the distribution is more concentrated in a smaller range of values and the mean estimate is very close to the true state (as seen in the residual plots).
+At $T=0$, we sample the particles from the initial model which is $Unif(0, 100)$ with a mean estimate close to 50. But, after updating the weights at $T=1$, we see that the values closer to the observation get higher weights. So, the mean estimate (weighted sum) has moved from 50 towards the observation value. At higher time steps, we see that the distribution is more concentrated in a smaller range of values and the mean estimate is very close to the true state (as seen in the residual plots).
 
 ***
 
@@ -439,7 +462,7 @@ ggplot() +
 
 ```
 
-From the above plots, we see as expected that the variation in the observations is higher when we increase the SD of the emission model. The mean estimates of the particles are still very reasonable for SD = 5 but not as accurate as when we used SD = 1. But with SD = 50, the mean estimates do not look reasonable for many of the time steps.
+From the above plots, we see as expected that the variation in the observations is higher when we increase the SD of the emission model. The mean estimates of the particles are still very reasonable for SD = 5 but not as accurate as when we used SD = 1. But with SD = 50, the mean estimates seem to contain higher errors and do not look very reasonable for certain time steps.
 
 
 ```{r}
@@ -470,7 +493,7 @@ grid.arrange(res_dist_sd5, res_dist_sd50, nrow = 1)
 
 ```
 
-When SD = 5, the residuals are mostly in the range $[-8, 5]$ and when SD = 50, the residuals are mostly in the range $[-20, 10]$. Comparatively, the residuals were mostly in the range $[-3, 3]$ when SD = 1. So, when we increase the SD of the emission model, the particle filter estimates become less accurate. We see that the observations themselves are very noisy and vary a lot compared to the true state when the emission model has higher SD. Since the noise in the emission model is high, it is difficult for the particle filter to estimate the hidden state and hence, it is not very accurate. 
+When SD = 5, the residuals are mostly in the range $[-8, 5]$ and when SD = 50, the residuals are mostly in the range $[-20, 10]$. Comparatively, the residuals were mostly in the range $[-3, 2]$ when SD = 1. So, when we increase the SD of the emission model, the particle filter estimates become less accurate. We see that the observations themselves are very noisy and vary a lot compared to the true state when the emission model has higher SD. Since the noise in the emission model is high, it is difficult for the particle filter to estimate the hidden state and hence, it is not very accurate. 
 
 ***
 
@@ -533,7 +556,7 @@ hist_plt(residuals_uncorr[2:100]) + labs(x = "Residuals") +
 
 From the comparison plot, it seems like there is a lag between the mean estimates of the particle filter and the true states/observations. We see that these residuals are in the range of $[-30, -15]$. 
 
-Since the weights are all equal, all the particles have an equal probability of being propagated to the next time step. This means that the observations have no impact on the particles and the particle values change only based on the transition model. We initially sample the particles from the initial model which is $Unif(0, 100)$ and it has a mean estimate close to 50. The first true state has a value around 70 and hence, the mean estimate varies by around -20. Since, we do not correct/update the weights, even those particles which would be less likely given the observation at that time step get propagated further and leads to this error being propagated to successive time steps. 
+Since the weights are all equal, all the particles have an equal probability of being propagated to the next time step. This means that the observations have no impact on the particles and the particle values change only based on the transition model. We initially sample the particles from the initial model which is $Unif(0, 100)$ and it has a mean estimate close to 50. The first true state has a value around 70 and hence, the mean estimate varies by around -20. Since, we do not correct/update the weights, even those particles which would be less likely given the observation at that time step get propagated further and leads to this error being propagated to successive time steps. So, this seems to be equivalent to simulating a new series of states using the transition model.
 
 ***
 
