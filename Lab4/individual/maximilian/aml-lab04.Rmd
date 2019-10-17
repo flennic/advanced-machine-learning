@@ -117,7 +117,8 @@ posteriorGP = function(X, Y, XStar, sigmaNoise, kernel, ...) {
                    variance=V_f_star,
                    lml = lml,
                    X=X, Y=Y,
-                   XStar=XStar)
+                   XStar=XStar,
+                   sigmaNoise=sigmaNoise)
   
   class(gp_object) = "gp"
 
@@ -132,27 +133,37 @@ posteriorGP = function(X, Y, XStar, sigmaNoise, kernel, ...) {
 #'
 #' @return If direct_plot is set to TRUE, the plot object.
 plot.gp = function(gp, direct_plot=TRUE) {
-  df = data.frame(x = grid,
+  df = data.frame(x = gp$XStar,
                 y = gp$mean,
-                y_upper = gp$mean + 1.96*sqrt(diag(gp$variance)),
-                y_lower = gp$mean - 1.96*sqrt(diag(gp$variance)))
+                y_upper_prob = gp$mean + 1.96*sqrt(diag(gp$variance)),
+                y_lower_prob = gp$mean - 1.96*sqrt(diag(gp$variance)),
+                y_upper_pred = gp$mean + 1.96*sqrt(diag(gp$variance) +
+                                                     gp$sigmaNoise^2),
+                y_lower_pred = gp$mean - 1.96*sqrt(diag(gp$variance) +
+                                                     gp$sigmaNoise^2))
 
   points = data.frame(x = gp$X, y = gp$Y)
   
   p = ggplot() +
-  geom_line(aes(x = df$x, y = df$y, colour = "Mean")) +
-  geom_ribbon(aes(x = df$x, ymin = df$y_lower, ymax = df$y_upper), 
-                alpha=0.05,
-                linetype=3,
-                colour="grey70",
-                size=1,
-                fill="black") +
-  geom_point(aes(x = points$x, y = points$y), color = "black",
-          fill = "#FFC300", shape = 21, size = 2, stroke = 1) +
-  labs(title = "Posterior Mean with 95 percent probability interval",
-       y = "Position", x = "Time", color = "Legend") +
-  scale_color_manual(values = c("#C70039", "#FF5733", "#581845")) +
-  theme_minimal()
+    geom_line(aes(x = df$x, y = df$y, colour = "Mean")) +
+    geom_ribbon(aes(x = df$x, ymin = df$y_lower_pred, ymax = df$y_upper_pred),
+                    alpha=0.05,
+                    linetype=3,
+                    colour="grey70",
+                    size=1,
+                    fill="black") +
+    geom_ribbon(aes(x = df$x, ymin = df$y_lower_prob, ymax = df$y_upper_prob),
+                    alpha=0.1,
+                    linetype=3,
+                    colour="grey70",
+                    size=1,
+                    fill="black") +
+    geom_point(aes(x = points$x, y = points$y), color = "black",
+                  fill = "#FFC300", shape = 21, size = 2, stroke = 1) +
+    labs(title = "Posterior Mean with intervals for Mean and Data",
+          y = "Position", x = "Time", color = "Legend") +
+    scale_color_manual(values = c("#C70039", "#FF5733", "#581845")) +
+    theme_minimal()
   
   if (!direct_plot)
     return(p)
