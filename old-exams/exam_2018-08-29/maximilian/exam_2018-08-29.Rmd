@@ -389,7 +389,7 @@ sample_observations = function(n) {
   states = vector(length = n) # X
   observations = vector(length = n) # Z
   states[1] = rinit(1)
-  observations[1] = remission(1, states[1])
+  observations[1] = remission(states[1])
   
   for(i in 2:n) {
     states[i] = rtransition(states[i-1])
@@ -471,18 +471,24 @@ Sigma_0<-10
 R<-1
 Q<-5
 
-x<-vector(length=T)
-z<-vector(length=T)
-err<-vector(length=T)
+x<-vector(length=10000)
+z<-vector(length=10000)
+err<-vector(length=10000)
 
-for(t in 1:T){
-  x[t]<-ifelse(t==1,rnorm(1,mu_0,Sigma_0),x[t-1]+1+rnorm(1,0,R))
-  z[t]<-x[t]+rnorm(1,0,Q)
-}
+#for(t in 1:T){
+#  x[t]<-ifelse(t==1,rnorm(1,mu_0,Sigma_0),x[t-1]+1+rnorm(1,0,R))
+#  z[t]<-x[t]+rnorm(1,0,Q)
+#}
 
+
+my_samples = sample = sample_observations(10000)
+x = my_samples$states
+z = my_samples$obs
+  
+  
 mu<-mu_0
 Sigma<-Sigma_0*Sigma_0 # KF uses covariances
-for(t in 2:T){
+for(t in 2:10000){
   pre_mu<-mu+1
   pre_Sigma<-Sigma+R*R # KF uses covariances
   K<-pre_Sigma/(pre_Sigma+Q*Q) # KF uses covariances
@@ -492,8 +498,8 @@ for(t in 2:T){
   err[t]<-abs(x[t]-mu)
 }
 
-mean(err[2:T])
-sd(err[2:T])
+mean(err[2:10000])
+sd(err[2:10000])
 
 ```
 

@@ -31,6 +31,257 @@ knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+# Graphical Models
+
+## D-Seperation
+
+```{r}
+
+# Learning the Network
+set.seed(123)
+data("asia")
+bayesian_network = hc(asia,restart=10,score="aic",iss=10)
+
+# Learning the Parameters
+bayesian_network_fit = bn.fit(bayesian_network, asia)
+# Compile for faster computations
+bayesian_network_grain = compile(as.grain(bayesian_network_fit))
+
+plot(bayesian_network)
+
+```
+
+```{r}
+
+# Case: E is independent from L | S, B 
+
+case1 = setFinding(bayesian_network_grain, nodes=c("S", "B", "E"),states=c("yes","yes", "no"))
+querygrain(case1, c("D"))
+
+case2 = setFinding(bayesian_network_grain, nodes=c("S", "B", "E"),states=c("no","yes", "no"))
+querygrain(case2, c("D"))
+
+```
+
+
+```{r}
+
+# Learn a BN from the Asia dataset, find a separation statement (e.g. B _|_ E | S, T) and, then, check that
+# it corresponds to a statistical independence.
+
+# SOLUTION
+set.seed(123)
+data("asia")
+hc3<-hc(asia,restart=10,score="bde",iss=10)
+plot(hc3)
+hc4<-bn.fit(hc3,asia,method="bayes")
+hc5<-as.grain(hc4)
+hc6<-compile(hc5)
+hc7<-setFinding(hc6,nodes=c("S","T","E"),states=c("yes","yes","yes"))
+querygrain(hc7,c("B"))
+hc7<-setFinding(hc6,nodes=c("S","T","E"),states=c("yes","yes","no"))
+querygrain(hc7,c("B"))
+hc7<-setFinding(hc6,nodes=c("S","T","E"),states=c("yes","no","yes"))
+querygrain(hc7,c("B"))
+hc7<-setFinding(hc6,nodes=c("S","T","E"),states=c("yes","no","no"))
+querygrain(hc7,c("B"))
+hc7<-setFinding(hc6,nodes=c("S","T","E"),states=c("no","yes","yes"))
+querygrain(hc7,c("B"))
+hc7<-setFinding(hc6,nodes=c("S","T","E"),states=c("no","yes","no"))
+querygrain(hc7,c("B"))
+hc7<-setFinding(hc6,nodes=c("S","T","E"),states=c("no","no","yes"))
+querygrain(hc7,c("B"))
+hc7<-setFinding(hc6,nodes=c("S","T","E"),states=c("no","no","no"))
+querygrain(hc7,c("B"))
+#B _|_ E | S, T
+
+```
+
+## Percentage of essentials DAGs
+
+```{r}
+
+isEquivalent = function(graph) {
+  return(!is.character(all.equal(cpdag(graph), skeleton(graph))))  
+}
+
+N = 10000
+
+# Randomly sample graphs
+graphs = random.graph(c("A", "B", "C", "D", "E"), num = N)
+counter = 0
+
+for (graph in graphs) {
+  if (isEquivalent(graph))
+    counter = counter + 1
+}
+
+print(counter/N)
+
+```
+
+# Hidden Markov Models
+
+```{r}
+
+set.seed(123)
+N = 100
+
+# Defining States Z1, Z2, ..., ZN
+states = paste(rep("Z", N), 1:N, sep = "")
+
+# Defining Symbols
+symbols = c("Door", "Corridor")
+
+# Starting Probabilities
+startProbs = rep(1/N, N)
+
+# Transition Probabilities
+transProbs = matrix(0, ncol = N, nrow = N)
+diag(transProbs) = 0.1
+diag(transProbs[,-1]) = 0.9
+transProbs[N, N] = 1.0
+
+# Emission Probabilities
+emissionProbs = matrix(NA, ncol = 2, nrow = N)
+emissionProbs[,1] = 0.1
+emissionProbs[,2] = 0.9
+emissionProbs[10,] = c(0.9, 0.1)
+emissionProbs[11,] = c(0.9, 0.1)
+emissionProbs[12,] = c(0.9, 0.1)
+emissionProbs[20,] = c(0.9, 0.1)
+emissionProbs[21,] = c(0.9, 0.1)
+emissionProbs[22,] = c(0.9, 0.1)
+emissionProbs[30,] = c(0.9, 0.1)
+emissionProbs[31,] = c(0.9, 0.1)
+emissionProbs[32,] = c(0.9, 0.1)
+
+robot_hmm = initHMM(States = states,
+                    Symbols = symbols,
+                    startProbs = startProbs,
+                    transProbs = transProbs,
+                    emissionProbs = emissionProbs)
+
+```
+
+
+```{r}
+
+nSim = 100
+simulatedStates = simHMM(robot_hmm, nSim)
+simulatedStates
+
+```
+
+```{r}
+
+custom_forward = function(hmm, observations) {
+  
+  Z = matrix(NA, ncol=length(hmm$States), nrow=length(observations))
+  
+  Z[1,] = hmm$emissionProbs[, observations[1]] * hmm$startProbs
+  
+  for (t in 2:length(observations)) {
+    Z[t, ] = hmm$emissionProbs[, observations[t]] * (Z[t-1,] %*% hmm$transProbs)
+  }
+  
+  return(t(Z))
+}
+
+start_time = Sys.time()
+alpha = exp(forward(robot_hmm, simulatedStates$observation))
+end_time = Sys.time()
+
+builtInForward = end_time - start_time
+
+start_time = Sys.time()
+alpha = exp(custom_forward(robot_hmm, simulatedStates$observation))
+end_time = Sys.time()
+
+customForward = end_time - start_time
+
+c(builtInForward, customForward)
+
+```
+
+
+```{r}
+
+filtered = prop.table(alpha, 2)
+
+which.maxima = function(x){
+  return(which(x==max(x)))
+}
+
+# For some reason we get werid behaviour at t=95. The system should be sure it
+# is in the last state, shouldn't it?
+apply(filtered, 2 ,which.maxima)
+
+
+```
+
+```{r, eval=FALSE}
+
+# Sweet animation. Plots a lot, so you have to call it manually!
+for (state in 1:(N-1)) {
+  plot(x=1:100, y=filtered[,state], type='l')
+  
+  if (state < N/5) {
+    Sys.sleep(0.5)
+  }
+  else {
+    Sys.sleep(0.1)
+  }
+}
+
+```
+
+
+## Solution
+
+```{r}
+
+set.seed(123)
+
+States<-1:100
+Symbols<-1:2 # 1=door
+
+transProbs<-matrix(rep(0,length(States)*length(States)), nrow=length(States), ncol=length(States), byrow = TRUE)
+for(i in 1:99){
+  transProbs[i,i]<-.1
+  transProbs[i,i+1]<-.9
+}
+
+emissionProbs<-matrix(rep(0,length(States)*length(Symbols)), nrow=length(States), ncol=length(Symbols), byrow = TRUE)
+for(i in States){
+  if(i %in% c(10,11,12,20,21,22,30,31,32)){
+    emissionProbs[i,1]<-.9
+    emissionProbs[i,2]<-.1
+  }
+  else{
+    emissionProbs[i,1]<-.1
+    emissionProbs[i,2]<-.9
+  }
+}
+
+startProbs<-rep(1/100,100)
+hmm<-initHMM(States,Symbols,startProbs,transProbs,emissionProbs)
+
+# If the robot observes a door, it can be in front of any of the three doors. If it then observes a long
+# sequence of non-doors, then it know that it was in front of the third door.
+
+obs<-c(1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2)
+pt<-prop.table(exp(forward(hmm,obs)),2)
+
+which.maxima<-function(x){ # This function is needed since which.max only returns the first maximum.
+  return(which(x==max(x)))
+}
+
+apply(pt,2,which.maxima)
+
+```
+
+
 # Source Code
 
 ```{r, ref.label=knitr::all_labels(), echo = TRUE, eval = FALSE, results = 'show'}
