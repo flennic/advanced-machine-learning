@@ -3,18 +3,18 @@ title: "Advanced Machine Learning - Exam 2017-10-09"
 author: "Maximilian Pfundstein (maxpf364)"
 date: "`r Sys.Date()`"
 output:
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 3
+  word_document:
+    toc: yes
+    toc_depth: '3'
   html_document:
     df_print: paged
     number_sections: no
     toc: yes
     toc_float: no
-  word_document:
-    toc: yes
-    toc_depth: '3'
-  pdf_document:
-    number_sections: yes
-    toc: yes
-    toc_depth: 3
 ---
 
 ```{r setup, include=FALSE}
@@ -23,6 +23,7 @@ library(bnlearn)
 library(gRain)
 library(caret)
 library(HMM)
+library(mvtnorm)
 library(reshape2)
 #if (!requireNamespace("BiocManager", quietly = TRUE))
 #    install.packages("BiocManager")
@@ -63,6 +64,7 @@ querygrain(case2, c("D"))
 
 ```
 
+**Solution:**
 
 ```{r}
 
@@ -97,7 +99,7 @@ querygrain(hc7,c("B"))
 
 ```
 
-## Percentage of essentials DAGs
+## Percentage of Essentials DAGs
 
 ```{r}
 
@@ -121,6 +123,8 @@ print(counter/N)
 ```
 
 # Hidden Markov Models
+
+## Modeling
 
 ```{r}
 
@@ -164,6 +168,7 @@ robot_hmm = initHMM(States = states,
 
 ```
 
+## Likelihood of Segments
 
 ```{r}
 
@@ -215,29 +220,23 @@ which.maxima = function(x){
 
 # For some reason we get werid behaviour at t=95. The system should be sure it
 # is in the last state, shouldn't it?
-apply(filtered, 2 ,which.maxima)
+apply(filtered, 2 ,which.maxima)[1:20]
 
 
 ```
 
-```{r, eval=FALSE}
+```{r, eval=FALSE, warning=FALSE}
 
 # Sweet animation. Plots a lot, so you have to call it manually!
-for (state in 1:(N-1)) {
+for (state in 1:(N-8)) {
   plot(x=1:100, y=filtered[,state], type='l')
   
-  if (state < N/5) {
-    Sys.sleep(0.5)
-  }
-  else {
-    Sys.sleep(0.1)
-  }
+  Sys.sleep((1-state/N) * 0.7)
 }
 
 ```
 
-
-## Solution
+**Solution:**
 
 ```{r}
 
@@ -281,6 +280,293 @@ apply(pt,2,which.maxima)
 
 ```
 
+# Gaussian Processes
+
+## A Priori
+
+```{r}
+
+# From KernelCode.R: 
+# Squared exponential, k
+k <- function(sigmaf = 1, ell = 1)  
+{   
+  rval <- function(x, y = NULL) 
+  {       
+    r = sqrt(crossprod(x-y))       
+    return(sigmaf^2*exp(-r^2/(2*ell^2)))     
+  }   
+  class(rval) <- "kernel"   
+  return(rval) 
+}
+
+#' cov_kernel
+#'
+#' @param X
+#' @param kernel A kernel functions.
+#' @param ... Parameters for the kernel function.
+#'
+#' @return Returns the covariance matrix where the kernel is being applied.
+cov_kernel = function(X, Y, kernel, ...) {
+  if (!is.vector(X) || !is.vector(Y))
+    stop("X and Y must be vectors.")
+  
+  K = matrix(NA, nrow = length(X), ncol = length(Y))
+  
+  for (i in 1:length(X)) {
+    for (j in 1:length(Y)) {
+      K[i, j] = kernel(X[i], Y[j], ...)
+    }
+  }
+  
+  return(K)
+}
+
+sigma_f = 1
+sigma_f_sq = 1
+
+ellOne = 0.2
+ellTwo = 1
+
+xGrid = seq(-1, 1, by=0.01)
+
+myKernelOne = k(sigma_f, ellOne)
+
+priorCovariance = cov_kernel(xGrid, xGrid, myKernelOne)
+priorMean = rep(0, nrow(priorCovariance))
+
+nFunctions = 5
+
+functions = rmvnorm(nFunctions, mean = priorMean, sigma = priorCovariance)
+
+ggplot() +
+  geom_line(aes(x = xGrid, y = priorMean, colour = "Prior Mean")) +
+  geom_line(aes(x = xGrid, y = functions[1,], colour = "Prior 1")) +
+  geom_line(aes(x = xGrid, y = functions[2,], colour = "Prior 2")) +
+  geom_line(aes(x = xGrid, y = functions[3,], colour = "Prior 3")) +
+  geom_line(aes(x = xGrid, y = functions[4,], colour = "Prior 4")) +
+  geom_line(aes(x = xGrid, y = functions[5,], colour = "Prior 5")) +
+  geom_ribbon(aes(x = xGrid,
+                  ymin = priorMean - 1.96 * diag(sqrt(priorCovariance)),
+                  ymax = priorMean + 1.96 * diag(sqrt(priorCovariance))),
+              alpha=0.05,
+              linetype=3,
+              colour="grey70",
+              size=1,
+              fill="black") +
+  labs(title = "Sampled prior functions with mean and 95% interval",
+    y = "Position", x = "Time", color = "Legend") +
+  scale_color_manual(values = c("#C70039", "#FF5733", "#581845",
+                                "#185845", "#584815", "#71AF50")) +
+  theme_minimal()
+
+
+```
+
+```{r}
+
+myKernelTwo = k(sigma_f, ellTwo)
+
+priorCovariance = cov_kernel(xGrid, xGrid, myKernelTwo)
+priorMean = rep(0, nrow(priorCovariance))
+
+nFunctions = 5
+
+functions = rmvnorm(nFunctions, mean = priorMean, sigma = priorCovariance)
+
+ggplot() +
+  geom_line(aes(x = xGrid, y = priorMean, colour = "Prior Mean")) +
+  geom_line(aes(x = xGrid, y = functions[1,], colour = "Prior 1")) +
+  geom_line(aes(x = xGrid, y = functions[2,], colour = "Prior 2")) +
+  geom_line(aes(x = xGrid, y = functions[3,], colour = "Prior 3")) +
+  geom_line(aes(x = xGrid, y = functions[4,], colour = "Prior 4")) +
+  geom_line(aes(x = xGrid, y = functions[5,], colour = "Prior 5")) +
+  geom_ribbon(aes(x = xGrid,
+                  ymin = priorMean - 1.96 * diag(sqrt(priorCovariance)),
+                  ymax = priorMean + 1.96 * diag(sqrt(priorCovariance))),
+              alpha=0.05,
+              linetype=3,
+              colour="grey70",
+              size=1,
+              fill="black") +
+  labs(title = "Sampled prior functions with mean and 95% interval",
+    y = "Position", x = "Time", color = "Legend") +
+  scale_color_manual(values = c("#C70039", "#FF5733", "#581845",
+                                "#185845", "#584815", "#71AF50")) +
+  theme_minimal()
+
+```
+
+**Correlations:** The correlation between the function at $x = $0 and $x = 0.1$ is much higher than between $x = 0$ and $x = 0.5$, since the latter points are more distant. Thus, the correlation decays with distance in x-space. This decay is much more rapid when $\ell = 0.2$ than when $\ell = 1$. This is also visible in the simulations where realized functions are much more smooth when $\ell = 1$.
+
+```{r}
+
+# ell = 0.2
+myKernelOne(0, 0.1) # Note: here correlation=covariance since sigmaf = 1 
+myKernelOne(0, 0.5)
+
+# ell = 1
+myKernelTwo(0, 0.1) # Note: here correlation=covariance since sigmaf = 1 
+myKernelTwo(0, 0.5)
+
+```
+
+## Posterior
+
+```{r}
+
+load("GPdata.RData")
+
+#' posteriorGP
+#'
+#' @param X Vector of training inputs.
+#' @param Y Vector of training targets/outputs.
+#' @param XStar Vector of inputs where the posterior distribution is evaluated,
+#               i.e XStar.
+#' @param sigmaNoise Noise standard deviation sigma_n.
+#' @param kernel A kernel function.
+#' @param ... Parameters for the kernel function.
+#'
+#' @return Vector with the posterior mean and variance of f evaluated on set XStar
+posteriorGP = function(X, Y, XStar, sigmaNoise, kernel, ...) {
+  
+  K = t(cov_kernel(X, X, kernel, ...))
+  L = t(chol(K + diag(sigmaNoise^2, length(X))))
+  
+  # Predictive Mean
+  alpha = solve(t(L), solve(L, Y))
+  K_star = cov_kernel(X, XStar, kernel, ...)
+  f_star = t(K_star) %*% alpha
+  
+  # Predictive Variance
+  V = solve(L, K_star)
+  V_f_star = cov_kernel(XStar, XStar, kernel, ...) - t(V) %*% V
+  
+  # Log Marginal Likelihood
+  n = length(X)
+  lml = -0.5 %*% t(Y) %*% alpha - sum(log(diag(L))) - (n/2) * log(2*pi)
+  
+  gp_object = list(mean=f_star,
+                   variance=V_f_star,
+                   lml = lml,
+                   X=X, Y=Y,
+                   XStar=XStar,
+                   sigmaNoise=sigmaNoise)
+  
+  class(gp_object) = "gp"
+  return(gp_object)
+}
+
+#' plot.gp
+#'
+#' @param gp An Gaussian Process ("gp") object.
+#' @param direct_plot TRUE by default. Determines if to plot directly or to
+#'                    return the plot.
+#'
+#' @return If direct_plot is set to TRUE, the plot object.
+plot.gp = function(gp, direct_plot=TRUE) {
+  df = data.frame(x = gp$XStar,
+                  y = gp$mean,
+                  y_upper_prob = gp$mean + 1.96*sqrt(diag(gp$variance)),
+                  y_lower_prob = gp$mean - 1.96*sqrt(diag(gp$variance)),
+                  y_upper_pred = gp$mean + 1.96*sqrt(diag(gp$variance) +
+                                                       gp$sigmaNoise^2),
+                  y_lower_pred = gp$mean - 1.96*sqrt(diag(gp$variance) +
+                                                       gp$sigmaNoise^2))
+  
+  points = data.frame(x = gp$X, y = gp$Y)
+                  
+  p = ggplot() +
+    geom_line(aes(x = df$x, y = df$y, colour = "Mean")) +
+    geom_ribbon(aes(x = df$x, ymin = df$y_lower_pred, ymax = df$y_upper_pred),
+                    alpha=0.05,
+                    linetype=3,
+                    colour="grey70",
+                    size=1,
+                    fill="black") +
+    geom_ribbon(aes(x = df$x, ymin = df$y_lower_prob, ymax = df$y_upper_prob),
+                    alpha=0.1,
+                    linetype=3,
+                    colour="grey70",
+                    size=1,
+                    fill="black") +
+    geom_point(aes(x = points$x, y = points$y), color = "black",
+                  fill = "#FFC300", shape = 21, size = 2, stroke = 1) +
+    labs(title = "Posterior Mean with 95 percent probability interval",
+          y = "Position", x = "Time", color = "Legend") +
+    scale_color_manual(values = c("#C70039", "#FF5733", "#581845")) +
+    theme_minimal()
+  
+  if (!direct_plot)
+    return(p)
+  
+  print(p)
+}
+
+```
+
+```{r}
+
+xGrid = seq(0, 1, by=0.01)
+
+sigmaNoise = 0.2
+sigma_f = 1
+
+ellThree = 0.2
+ellFour = 1
+
+myKernelThree = k(sigma_f, ellThree)
+myKernelFour = k(sigma_f, ellFour)
+
+# Maybe in the exam he actually wants us to use the built-in function
+# Then we should definitely do that, makes the plotting annoying though.
+# GPfit = gausspr(x, y, kernel = kernelFunc, var = sigmaNoise^2)
+
+# Also he wants us to use the custom built gp_covariance function...
+# Pay attention to that
+
+gp_post_0_2 = posteriorGP(x, y, xGrid, sigmaNoise, myKernelThree)
+gp_post_1 = posteriorGP(x, y, xGrid, sigmaNoise, myKernelFour)
+
+```
+
+```{r}
+
+plot(gp_post_0_2)
+
+```
+
+```{r}
+
+plot(gp_post_1)
+
+```
+
+
+**Question:** Explain the difference between the results from ii) and iii). 
+
+**Answer:**
+
+- ii) is about the uncertainty of the function f, which is the MEAN of y
+- iii) is about the uncertainty of individual y values. They are uncertain for two reasons: you don't know f at the test point, and you don't know the error (epsilon) that will hit this individual observation.
+
+**Question:** Discuss the differences in results from using the two length scales.
+
+**Answer:** Shorter length scale gives less smooth f. We are overfitting the data.
+
+**Answer:** Longer length scale gives more smoothness.
+
+**Question:** Do you think a GP with a squared exponential kernel is a good model for this data? If not, why?
+
+**Answer:** One would have to experiment with other length scales, or estimate the length scales (see question 3c), but this is not likely to help here. The issue is that the data seems to be have different smoothness for small x than it has for large x (where the function seems much more flat) The solution is probably to have different length scales for different x.
+
+## Bayesian View
+
+For full points here you should mention EITHER of the following two approaches:
+
+1. The marginal likelihood can be used to select optimal hyperparameters and also the noise variance. We can optimize the log marginal likelihood with respect to the hyperparameters. In Gaussian Process Regression the marginal likelihood is availble in closed form (a formula).
+2. We can use sampling methods (e.g. MCMC) to sample from the marginal posterior of the hyperparameters. We need a prior $p(\theta)$ for the hyperparameter and then Bayes rule gives the marginal posterior $p(\theta | \text{data}) \propto p(\text{data} | \theta) p(\theta)$ $where p(\text{data} | \theta)$ is the marginal likelihood (f has been integrated out).
+
+ If the noise variance is unknown, we can treat like any of the kernel hyperparameters and infer the noise variance jointly with the length scale and the prior variance $\sigma_f$.
 
 # Source Code
 
