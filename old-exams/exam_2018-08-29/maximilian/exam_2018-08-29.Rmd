@@ -92,14 +92,14 @@ res_approx_no
 
 ```{r}
 
-isEquivilant = function(graph) {
+isEquivilent = function(graph) {
   res = all.equal(cpdag(graph), skeleton(graph))
   return(res == "TRUE")
 }
 
 random_networks = random.graph(c("a", "b", "c", "d", "e"), num=50000)
 
-res = sapply(random_networks, isEquivilant)
+res = sapply(random_networks, isEquivilent)
 
 sum(res)/length(res)
 
@@ -152,7 +152,7 @@ robot_hmm = initHMM(States = states,
 
 observations = c("S1", "S11", "S11", "S11")
 
-# The library returns the probabilities logged, we we have to de-log
+# The library returns the probabilities logged, so we have to de-log
 alpha = exp(forward(robot_hmm, observations))
 beta = exp(backward(robot_hmm, observations))
 

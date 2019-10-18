@@ -297,7 +297,6 @@ tail(temp_stockholm_reduced)
 
 ```
 
-
 ## Computing the Covariance Matrix
 
 **Task:** Familiarize yourself with the functions `gausspr` and `kernelMatrix` in `kernlab`. Do `?gausspr` and read the input arguments and the output. Also, go through the file `KernLabDemo.R` available on the course website. You will need to understand it. Now, define your own square exponential kernel function (with parameters $\ell$ (`ell`) and $\sigma_f$ (`sigmaf`)), evaluate it in the point $x=1$, $x'=2$ and and use the `kernelMatrix` function to compute the covariance matrix $K(X,X_*)$ for the input vectors $X = (1,3,4)^T$ and $X_* = (2,3,4)^T$.
@@ -358,8 +357,8 @@ Let $\sigma_n^2$ be the residual variance from a simple quadratic regression fit
 
 #' gp_covariance
 #'
-#' @param x X, which will be scaled.
-#' @param xss X_star, which will be scaled.
+#' @param x X.
+#' @param xss X_star.
 #'
 #' @return The covariance matrix.
 gp_covariance = function(x, xs, kernel, sigma_n) {
@@ -376,10 +375,12 @@ gp_covariance = function(x, xs, kernel, sigma_n) {
 
 ```
 
+
 ```{r}
 
 # Parameters
 sigma_n = sd(lm(temp ~ time + I(time^2), data = temp_stockholm_reduced)$res)
+
 sigma_f = 20
 ell = 0.2
 

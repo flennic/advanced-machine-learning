@@ -123,7 +123,7 @@ custom_backward = function(hmm, observations) {
 
 ```{r}
 
-# The library returns the probabilities logged, we we have to de-log
+# The library returns the probabilities logged, so we have to de-log
 alpha = exp(forward(robot_hmm, simulatedStates$observation))
 beta = exp(backward(robot_hmm, simulatedStates$observation))
 
