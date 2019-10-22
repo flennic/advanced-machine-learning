@@ -378,6 +378,57 @@ gp_covariance = function(x, xs, kernel, sigma_n) {
 
 ```{r}
 
+posteriorGpLml = function(params, X, Y, sigmaNoise, ...) {
+  
+  kernel = se_kernel_factory(params[1], params[2])
+  
+  K = t(cov_kernel(X, X, kernel, ...))
+  L = t(chol(K + diag(sigmaNoise^2, length(X))))
+  
+  # Predictive Mean
+  alpha = solve(t(L), solve(L, Y))
+  
+  # Log Marginal Likelihood
+  lml = -0.5 %*% t(Y) %*% alpha - sum(log(diag(L))) - (length(X)/2) * log(2*pi)
+
+  return(lml)
+}
+
+```
+
+```{r}
+
+# with grid search I am getting the best parameters sigmaF 15 and l 0.3
+#Mine was - 499.39
+
+res = optim(c(20, 0.9),
+            method="L-BFGS-B",
+            lower=c(0.01, 0.01),
+            upper=c(Inf, 1),
+            posteriorGpLml,
+            X=temp_stockholm_reduced$temp,
+            Y=temp_stockholm_reduced$time,
+            sigmaNoise=sigma_n,
+            control=list(fnscale=-1))
+
+sigma_f = res$par[1]
+ell = res$par[2]
+
+# fnscale = 1
+# [1] 0.01 0.01
+# -5,227,740
+
+# fnscale = -1
+# [1] 1186.434    0.010
+# -531,431.7
+c(sigma_f, ell)
+posteriorGpLml(c(sigma_f, ell), temp_stockholm_reduced$temp,temp_stockholm_reduced$time,sigma_n)
+
+```
+
+
+```{r}
+
 # Parameters
 sigma_n = sd(lm(temp ~ time + I(time^2), data = temp_stockholm_reduced)$res)
 

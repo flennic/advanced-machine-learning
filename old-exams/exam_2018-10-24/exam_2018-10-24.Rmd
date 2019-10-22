@@ -14,6 +14,7 @@ if (!requireNamespace("BiocManager", quietly = TRUE))
 #BiocManager::install("gRain")
 #BiocManager::install("gRbase")
 library(gRain)
+library(HMM)
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
@@ -24,129 +25,96 @@ knitr::opts_chunk$set(echo = TRUE)
 set.seed(567)
 data("asia")
 ind <- sample(1:5000, 4000)
-train <- asia[ind,]
-test <- asia[-ind,]
+tr <- asia[ind,]
+te <- asia[-ind,]
 
 ```
 
 ```{r}
 
-train_10 = train[1:10,]
-train_20 = train[1:20,]
-train_50 = train[1:50,]
-train_100 = train[1:100,]
-train_1000 = train[1:1000,]
-train_2000 = train[1:2000,]
-test_1000 = test[1:1000,]
-
-```
-
-```{r}
-
-## Training the network
-train_bayesian_network = function(structure = NULL,
-                                  data,
-                                  learning_algorithm = iamb,
-                                  ...) {
-
-  # Network
-  if (is.null(structure)) {
-    bayesian_network = learning_algorithm(data, ...)
-  }
-  else {
-    bayesian_network = structure
-  }
+test_network = function(network, test_set) {
+  grain = compile(as.grain(network))
   
-  # Parameters
-  bayesian_network_fit = bn.fit(bayesian_network, data, method="bayes")
-  bayesian_network_grain = compile(as.grain(bayesian_network_fit))
+  predictions = t(apply(test_set, 1, function(x) {
+    evidence = setEvidence(grain, names(x[-2]), x[-2])
+    query = querygrain(evidence)
+    return(query$S)
+  }))
   
-  return(list(bn_grain=bayesian_network_grain,
-              bn_fit=bayesian_network_fit,
-              bn_structure=bayesian_network))
+  classified = apply(predictions, 1, function(x) {
+    if (x[1] > 0.5)
+      return("no")
+    return("yes")
+  })
+  
+  accuracy = sum(test_set$S == classified) / length(test_set$S)
+  return(accuracy)
 }
 
 ```
 
+```{r, warning=FALSE}
 
-```{r}
-
-# Structure
 bn_naive_bayes = model2network("[S][A|S][T|S][L|S][B|S][E|S][X|S][D|S]")
 plot(bn_naive_bayes)
 
+bn_net_10 = bn.fit(bn_naive_bayes, tr[1:10,], method = "bayes")
+bn_net_20 = bn.fit(bn_naive_bayes, tr[1:20,], method = "bayes")
+bn_net_50 = bn.fit(bn_naive_bayes, tr[1:50,], method = "bayes")
+bn_net_100 = bn.fit(bn_naive_bayes, tr[1:100,], method = "bayes")
+bn_net_1000 = bn.fit(bn_naive_bayes, tr[1:1000,], method = "bayes")
+bn_net_2000 = bn.fit(bn_naive_bayes, tr[1:2000,], method = "bayes")
+
+acc_10 = test_network(bn_net_10, te)
+acc_20 = test_network(bn_net_20, te)
+acc_50 = test_network(bn_net_50, te)
+acc_100 = test_network(bn_net_100, te)
+acc_1000 = test_network(bn_net_1000, te)
+acc_2000 = test_network(bn_net_2000, te)
+
+# Reversing the edges
+bn_naive_bayes = model2network("[A][T][L][B][E][X][D][S|A:T:L:B:E:X:D]")
+plot(bn_naive_bayes)
+
+bn_net_10_rev = bn.fit(bn_naive_bayes, tr[1:10,], method = "bayes")
+bn_net_20_rev = bn.fit(bn_naive_bayes, tr[1:20,], method = "bayes")
+bn_net_50_rev = bn.fit(bn_naive_bayes, tr[1:50,], method = "bayes")
+bn_net_100_rev = bn.fit(bn_naive_bayes, tr[1:100,], method = "bayes")
+bn_net_1000_rev = bn.fit(bn_naive_bayes, tr[1:1000,], method = "bayes")
+bn_net_2000_rev = bn.fit(bn_naive_bayes, tr[1:2000,], method = "bayes")
+
+acc_10_rev = test_network(bn_net_10_rev, te)
+acc_20_rev = test_network(bn_net_20_rev, te)
+acc_50_rev = test_network(bn_net_50_rev, te)
+acc_100_rev = test_network(bn_net_100_rev, te)
+acc_1000_rev = test_network(bn_net_1000_rev, te)
+acc_2000_rev = test_network(bn_net_2000_rev, te)
+
 ```
 
 ```{r}
 
-bn_naive_bayes10 = train_bayesian_network(structure = bn_naive_bayes,
-                       data = train_10,
-                       learning_algorithm = hc)
+# Accuracy stays the same and does not increase having more training points
+# Even gets slightly worse for more training points
+print(c(acc_10, acc_20, acc_50, acc_100, acc_1000, acc_2000))
 
-bn_naive_bayes20 = train_bayesian_network(structure = bn_naive_bayes,
-                       data = train_20,
-                       learning_algorithm = hc)
+# Here we see that the accuracy actually increases with more training points
+print(c(acc_10_rev, acc_20_rev, acc_50_rev, acc_100_rev, acc_1000_rev, acc_2000_rev))
 
-bn_naive_bayes50 = train_bayesian_network(structure = bn_naive_bayes,
-                       data = train_50,
-                       learning_algorithm = hc)
-
-bn_naive_bayes100 = train_bayesian_network(structure = bn_naive_bayes,
-                       data = train_100,
-                       learning_algorithm = hc)
-
-bn_naive_bayes1000 = train_bayesian_network(structure = bn_naive_bayes,
-                       data = train_1000,
-                       learning_algorithm = hc)
-
-bn_naive_bayes2000 = train_bayesian_network(structure = bn_naive_bayes,
-                       data = train_2000,
-                       learning_algorithm = hc)
-
-```
-
-```{r}
-
-## Predicting with the network
-predict_bayesian_network = function(bayesian_network,
-                                    testX_ = testX,
-                                    testY_ = testY) {
-  
-  res = apply(testX_, 1, FUN = function(x) {
-    return(querygrain(setEvidence(bayesian_network$bn_grain, names(x), x))$S)
-  })
-  
-  # Classify
-  pred = apply(res, 2, FUN = function(x) {
-    if (x[2] > 0.5) return("yes")
-    return("no")
-  })
-  
-  # Factorise
-  testY_factor = testY_
-  pred_factor = factor(pred)
-  
-  # Call to a library to calculate interesting metrics
-  confusion_matrix = table(pred_factor, testY_factor)
-  
-  return(list(res=res, pred=pred, cf=confusion_matrix))
-}
-
-myResConf10 = predict_bayesian_network(bn_naive_bayes10, test_1000[,-2], test_1000$S)$cf
-myResConf20 = predict_bayesian_network(bn_naive_bayes20, test_1000[,-2], test_1000$S)$cf
-myResConf50 = predict_bayesian_network(bn_naive_bayes50, test_1000[,-2], test_1000$S)$cf
-myResConf100 = predict_bayesian_network(bn_naive_bayes100, test_1000[,-2], test_1000$S)$cf
-myResConf1000 = predict_bayesian_network(bn_naive_bayes1000, test_1000[,-2], test_1000$S)$cf
-myResConf2000 = predict_bayesian_network(bn_naive_bayes2000, test_1000[,-2], test_1000$S)$cf
-
-acc10 = sum(diag(myResConf10))/sum(myResConf10)
-acc20 = sum(diag(myResConf20))/sum(myResConf20)
-acc50 = sum(diag(myResConf50))/sum(myResConf50)
-acc100 = sum(diag(myResConf100))/sum(myResConf100)
-acc1000 = sum(diag(myResConf1000))/sum(myResConf1000)
-acc2000 = sum(diag(myResConf2000))/sum(myResConf2000)
-
-print(c(acc10, acc20, acc50, acc100, acc1000, acc2000))
+# Discussion
+# The NB classifier only needs to estimate the parameters for distributions of the form
+# p(C) and P(A_i|C) where C is the class variable and A_i is a predictive attribute. The
+# alternative model needs to estimate p(C) and P(C|A_1,...,A_n). Therefore, it requires
+# more data to obtain reliable estimates (e.g. many of the parental combinations may not
+# appear in the training data and this is actually why you should use method="bayes", to
+# avoid zero relative frequency counters).This may hurt performance when little learning
+# data is available. This is actually observed in the experiments above. However, when
+# the size of the learning data increases, the alternative model should outperform NB, because
+# the latter assumes that the attributes are independent given the class whereas the former
+# does not. In other words, note that p(C|A_1,...,A_n) is proportional to P(A_1,...,A_n|C) p(C)
+# by Bayes theorem. NB assumes that P(A_1,...,A_n|C) factorizes into a product of factors
+# p(A_i|C) whereas the alternative model assumes nothing. The NB's assumption may hurt
+# performance. This can be observed in the experiments.
 
 ```
 

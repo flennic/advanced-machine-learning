@@ -1,5 +1,5 @@
 ---
-title: "Advanced Machine Learning - Exam 2017-10-09"
+title: "Advanced Machine Learning - Exam 2017-10-19"
 author: "Maximilian Pfundstein (maxpf364)"
 date: "`r Sys.Date()`"
 output:
@@ -54,8 +54,6 @@ plot(bayesian_network)
 
 ```{r}
 
-# Case: E is independent from L | S, B 
-
 case1 = setFinding(bayesian_network_grain, nodes=c("S", "B", "E"),states=c("yes","yes", "no"))
 querygrain(case1, c("D"))
 
@@ -103,22 +101,18 @@ querygrain(hc7,c("B"))
 
 ```{r}
 
-isEquivalent = function(graph) {
-  return(!is.character(all.equal(cpdag(graph), skeleton(graph))))  
+f = function(graph) {
+  return(!is.character(all.equal(cpdag(graph), graph)))  
 }
 
-N = 10000
+N = 50000
 
 # Randomly sample graphs
-graphs = random.graph(c("A", "B", "C", "D", "E"), num = N)
-counter = 0
+graphs = random.graph(c("A", "B", "C", "D", "E"), num = N, method="melancon")
+unique_graphs = unique(graphs)
 
-for (graph in graphs) {
-  if (isEquivalent(graph))
-    counter = counter + 1
-}
+length(unique_graphs)/sum(sapply(unique_graphs, f))
 
-print(counter/N)
 
 ```
 
@@ -564,7 +558,7 @@ plot(gp_post_1)
 For full points here you should mention EITHER of the following two approaches:
 
 1. The marginal likelihood can be used to select optimal hyperparameters and also the noise variance. We can optimize the log marginal likelihood with respect to the hyperparameters. In Gaussian Process Regression the marginal likelihood is availble in closed form (a formula).
-2. We can use sampling methods (e.g. MCMC) to sample from the marginal posterior of the hyperparameters. We need a prior $p(\theta)$ for the hyperparameter and then Bayes rule gives the marginal posterior $p(\theta | \text{data}) \propto p(\text{data} | \theta) p(\theta)$ $where p(\text{data} | \theta)$ is the marginal likelihood (f has been integrated out).
+2. We can use sampling methods (e.g. MCMC) to sample from the marginal posterior of the hyperparameters. We need a prior $p(\theta)$ for the hyperparameter and then Bayes rule gives the marginal posterior $p(\theta | \text{data}) \propto p(\text{data} | \theta) p(\theta)$ $\text{where } p(\text{data} | \theta)$ is the marginal likelihood (f has been integrated out).
 
  If the noise variance is unknown, we can treat like any of the kernel hyperparameters and infer the noise variance jointly with the length scale and the prior variance $\sigma_f$.
 

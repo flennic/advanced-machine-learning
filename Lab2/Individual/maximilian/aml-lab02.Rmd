@@ -118,6 +118,100 @@ custom_backward = function(hmm, observations) {
   return(t(Z))
 }
 
+viterbi = function (hmm, observation) 
+{
+    observation = observations
+    hmm$transProbs[is.na(hmm$transProbs)] = 0
+    hmm$emissionProbs[is.na(hmm$emissionProbs)] = 0
+    nObservations = length(observation)
+    nStates = length(hmm$States)
+    v = array(NA, c(nStates, nObservations))
+    dimnames(v) = list(states = hmm$States, index = 1:nObservations)
+    for (state in hmm$States) {
+        v[state, 1] = log(hmm$startProbs[state] * hmm$emissionProbs[state, 
+            observation[1]])
+    }
+    for (k in 2:nObservations) {
+        for (state in hmm$States) {
+            maxi = NULL
+            for (previousState in hmm$States) {
+                temp = v[previousState, k - 1] + log(hmm$transProbs[previousState, 
+                  state])
+                maxi = max(maxi, temp)
+            }
+            v[state, k] = log(hmm$emissionProbs[state, observation[k]]) + 
+                maxi
+        }
+    }
+    viterbiPath = rep(NA, nObservations)
+    for (state in hmm$States) {
+        if (max(v[, nObservations]) == v[state, nObservations]) {
+            viterbiPath[nObservations] = state
+            break
+        }
+    }
+    for (k in (nObservations - 1):1) {
+        for (state in hmm$States) {
+            if (max(v[, k] + log(hmm$transProbs[, viterbiPath[k + 1]])) == v[state, k] + log(hmm$transProbs[state, viterbiPath[k + 1]])) {
+                viterbiPath[k] = state
+                break
+            }
+        }
+    }
+    return(viterbiPath)
+}
+
+my_viterbi = function(observations, transProbs, emissionProbs, startProbs){
+  
+  T = length(observations)
+  D = nrow(transProbs)
+  omega = matrix(nrow = D, ncol = T)
+  psi = matrix(nrow = D, ncol = T)
+  
+  omega[, 1] = log(startProbs) + log(as.numeric(emissionProbs[, observations[1]]))
+  
+  for (t in 1:(T-1)){
+
+    temp = log(transProbs) + matrix(rep(omega[, t], D), ncol = D, byrow = FALSE)
+    omega[, t+1] = log(as.numeric(emissionProbs[, observations[t+1]])) + 
+                   apply(temp, 2, max)
+    psi[, t] = apply(temp, 2, which.max)
+    
+  }
+  
+  Z = apply(omega, 2, which.max)
+  
+  for (t in (T-1):1){
+    Z[t] = psi[Z[t+1], t]
+  }
+  
+  return(Z)
+  
+}
+
+custom_viterbi = function(hmm, observations) {
+  
+  W = matrix(NA, ncol=length(hmm$States), nrow=length(observations))
+  path = vector(length = length(observations))
+  
+  W[1,] = log(hmm$startProbs) + log(hmm$emissionProbs[, observations[1]])
+  
+  for (t in 2:(length(observations))) {
+    for (state in 1:length(hmm$States)) {
+      max_entry = max(W[t-1, ] + log(hmm$transProbs[, state]))
+      W[t, state] = log(hmm$emissionProbs[state, observations[t]]) + max_entry
+    }
+  }
+  
+  path[length(observations)] = which.max(W[length(observations), ])
+  
+  for (t in (length(observations)-1):1) {
+    path[t] = which.max(W[t, ] + log(hmm$transProbs[, path[t + 1]]))
+  }
+  
+  return(path)
+}
+
 ```
 
 

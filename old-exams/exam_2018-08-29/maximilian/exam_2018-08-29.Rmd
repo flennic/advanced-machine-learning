@@ -98,6 +98,7 @@ isEquivilent = function(graph) {
 }
 
 random_networks = random.graph(c("a", "b", "c", "d", "e"), num=50000)
+#random_networks = unique(random_networks)
 
 res = sapply(random_networks, isEquivilent)
 
